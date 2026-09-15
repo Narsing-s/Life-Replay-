@@ -1,10 +1,18 @@
 {
   "name": "life-replay",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Life Replay — turn your memories into a story.",
   "scripts": {
-    "dev": "python3 -m http.server 4173",
-    "preview": "python3 -m http.server 4173"
+    "dev": "node server.js",
+    "start": "node server.js",
+    "preview": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.10.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2"
   }
 }
