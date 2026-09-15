@@ -26,6 +26,7 @@ The production backend provides authenticated memory storage, image uploads, sha
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Security Policy](SECURITY.md)
+- [Support Guide](SUPPORT.md)
 - [Changelog](CHANGELOG.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [API Reference](docs/API.md)
@@ -47,7 +48,7 @@ Dependabot is configured for npm dependencies and GitHub Actions. These checks a
 
 ## GitHub Pages
 
-The repository contains a top-level `index.html`, so the simplest GitHub Pages setup is **Deploy from a branch** using `main` and `/(root)`.
+The repository contains a top-level `index.html`, so the simplest GitHub Pages setup is **Deploy from a branch** using `main` and `/(root)`. GitHub recommends branch publishing when no custom build process is required. citeturn0search1
 
 Open repository Pages settings:
 
@@ -62,6 +63,8 @@ Set:
 Expected project URL:
 
 `https://narsing-s.github.io/Life-Replay-/`
+
+GitHub Pages requires the entry file at the top level of the selected publishing source. This repository provides `index.html` and `.nojekyll` at the root. citeturn0search3turn0search5
 
 ## Production backend
 
@@ -139,7 +142,7 @@ Never commit passwords, API keys, JWT secrets, private photos, databases, or use
 
 ## Contributing
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before opening an issue or pull request. Bug reports and feature requests have repository templates under `.github/ISSUE_TEMPLATE/`.
+Please read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SUPPORT.md](SUPPORT.md) before opening an issue or pull request. Bug reports and feature requests have repository templates under `.github/ISSUE_TEMPLATE/`.
 
 ## Roadmap
 
