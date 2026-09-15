@@ -26,9 +26,24 @@ The production backend provides authenticated memory storage, image uploads, sha
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Security Policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [API Reference](docs/API.md)
 - [Deployment Guide](docs/DEPLOYMENT.md)
+- [Testing Guide](docs/TESTING.md)
+
+## Quality and security automation
+
+Every push and pull request targeting `main` is checked by GitHub Actions for:
+
+- Node.js syntax validation
+- Automated API/authentication tests
+- High-severity production dependency vulnerabilities
+- Docker image build health
+- CodeQL security analysis
+- Dependency changes on pull requests
+
+Dependabot is configured for npm dependencies and GitHub Actions. These checks are intended to catch regressions and supply-chain risks before production deployment.
 
 ## GitHub Pages
 
@@ -71,10 +86,13 @@ Requirements: Node.js 22+ and npm.
 
 ```bash
 npm install
+npm test
 JWT_SECRET="replace-with-a-long-random-secret" npm start
 ```
 
 Open `http://localhost:4173`.
+
+Use `.env.example` as the starting point for local configuration. Never commit real secrets.
 
 ### Docker
 
@@ -83,7 +101,7 @@ docker build -t life-replay .
 docker run -p 4173:4173 -e JWT_SECRET="replace-with-a-long-random-secret" -v life-replay-data:/app/data life-replay
 ```
 
-Production hosting must use persistent storage for the SQLite database and uploaded media, or replace this storage layer with managed PostgreSQL plus object storage.
+The production image runs as a non-root user and exposes a container healthcheck. Production hosting must use persistent storage for the SQLite database and uploaded media, or replace this storage layer with managed PostgreSQL plus object storage.
 
 ## API overview
 
@@ -103,7 +121,7 @@ Production hosting must use persistent storage for the SQLite database and uploa
 
 `DELETE /api/memories/:id` — Bearer token required
 
-`POST /api/share` — creates a public story token
+`POST /api/share` — creates a public share token
 
 `GET /api/share/:token` — reads a public story
 
@@ -115,6 +133,7 @@ Production hosting must use persistent storage for the SQLite database and uploa
 - Uploaded filenames are replaced with random IDs.
 - Public links use high-entropy random tokens.
 - Public share endpoints do not expose passwords or account credentials.
+- Local database, upload and environment files are excluded from Git.
 
 Never commit passwords, API keys, JWT secrets, private photos, databases, or user-uploaded data.
 
