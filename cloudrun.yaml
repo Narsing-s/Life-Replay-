@@ -1,0 +1,30 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: life-replay-api
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "10"
+    spec:
+      containerConcurrency: 80
+      containers:
+        - image: REGION-docker.pkg.dev/PROJECT_ID/life-replay/life-replay:latest
+          ports:
+            - containerPort: 4173
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "4173"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: life-replay-jwt
+                  key: latest
+            - name: ALLOWED_ORIGINS
+              value: https://narsing-s.github.io
+            - name: DATA_DIR
+              value: /tmp/life-replay
