@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: life-replay
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATA_DIR
+        value: /app/data
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://life-replay.onrender.com
+    disk:
+      name: life-replay-data
+      mountPath: /app/data
+      sizeGB: 1
