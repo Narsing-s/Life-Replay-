@@ -22,9 +22,10 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '22.x'
-          cache: npm
       - name: Install dependencies
         run: npm install
+      - name: Syntax check
+        run: npm run check
       - name: Run tests
         run: npm test
       - name: Audit production dependencies
