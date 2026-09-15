@@ -1,14 +1,14 @@
 {
   "name": "life-replay",
   "private": true,
-  "version": "0.2.0",
-  "description": "Life Replay — turn your memories into a story.",
+  "version": "1.0.0",
+  "description": "Life Replay — private personal memory atlas and replay platform.",
   "scripts": {
-    "dev": "node server.js",
-    "start": "node server.js",
-    "preview": "node server.js",
+    "dev": "node -r ./feature-loader.js server.js",
+    "start": "node -r ./feature-loader.js server.js",
+    "preview": "node -r ./feature-loader.js server.js",
     "test": "node --test",
-    "check": "node --check server.js"
+    "check": "node --check server.js && node --check feature-loader.js && node --check feature-routes.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
