@@ -13,8 +13,12 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean);
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'change-me-in-production') {
+  throw new Error('JWT_SECRET must be configured in production');
+}
+
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 const db = new Database(path.join(DATA_DIR, 'life-replay.db'));
 db.pragma('journal_mode = WAL');
 db.exec(`
@@ -24,9 +28,10 @@ CREATE TABLE IF NOT EXISTS share_links (token TEXT PRIMARY KEY, user_id TEXT NOT
 `);
 
 const app = express();
+app.disable('x-powered-by');
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (!origin || ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin) || origin === `http://localhost:${PORT}`) {
+  if (!origin || ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin) || /^https?:\/\/localhost(?::\d+)?$/.test(origin)) {
     if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Vary', 'Origin');
@@ -53,8 +58,13 @@ function tokenFor(user) { return jwt.sign({ sub: user.id }, JWT_SECRET, { expire
 function auth(req, res, next) {
   const value = req.headers.authorization || '';
   if (!value.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
-  try { req.user = db.prepare('SELECT * FROM users WHERE id=?').get(jwt.verify(value.slice(7), JWT_SECRET).sub); if (!req.user) throw new Error(); next(); }
-  catch { res.status(401).json({ error: 'Invalid or expired session' }); }
+  try {
+    req.user = db.prepare('SELECT * FROM users WHERE id=?').get(jwt.verify(value.slice(7), JWT_SECRET).sub);
+    if (!req.user) throw new Error();
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid or expired session' });
+  }
 }
 
 app.get('/api/config', (_, res) => res.json({ googleClientId: GOOGLE_CLIENT_ID }));
@@ -62,9 +72,9 @@ app.get('/api/health', (_, res) => res.json({ ok: true, service: 'life-replay', 
 app.post('/api/auth/register', async (req, res) => {
   const { email, password, name } = req.body || {};
   if (!/^\S+@\S+\.\S+$/.test(email || '') || !password || password.length < 8 || !(name || '').trim()) return res.status(400).json({ error: 'Name, valid email and password (8+ characters) are required' });
-  const exists = db.prepare('SELECT id FROM users WHERE email=?').get(email.toLowerCase());
-  if (exists) return res.status(409).json({ error: 'An account already exists for this email' });
-  const user = { id: crypto.randomUUID(), email: email.toLowerCase(), name: name.trim(), password_hash: await bcrypt.hash(password, 12), created_at: new Date().toISOString() };
+  const normalizedEmail = email.toLowerCase();
+  if (db.prepare('SELECT id FROM users WHERE email=?').get(normalizedEmail)) return res.status(409).json({ error: 'An account already exists for this email' });
+  const user = { id: crypto.randomUUID(), email: normalizedEmail, name: name.trim(), password_hash: await bcrypt.hash(password, 12), created_at: new Date().toISOString() };
   db.prepare('INSERT INTO users VALUES (?,?,?,?,?)').run(user.id, user.email, user.password_hash, user.name, user.created_at);
   res.status(201).json({ user: publicUser(user), token: tokenFor(user) });
 });
@@ -101,5 +111,9 @@ app.get('/api/share/:token', (req, res) => {
   res.json({ owner, memories });
 });
 app.get('/share/:token', (_, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('*', (_, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.use((req, res) => {
+  if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'API route not found' });
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 app.listen(PORT, () => console.log(`Life Replay listening on :${PORT}`));
