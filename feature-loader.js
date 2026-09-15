@@ -23,8 +23,8 @@ express.application.listen = function patchedListen(...args) {
         next();
       } catch { res.status(401).json({ error: 'Invalid or expired session' }); }
     };
-    featureRoutes({ app: this, db, auth });
     productionHardening({ app: this, db, auth, jwtSecret: secret });
+    featureRoutes({ app: this, db, auth });
   }
   return originalListen.apply(this, args);
 };
