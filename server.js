@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const Database = require('better-sqlite3');
+const featureRoutes = require('./feature-routes');
 
 const PORT = process.env.PORT || 4173;
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
@@ -14,7 +15,6 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const configuredOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean);
 const ALLOWED_ORIGINS = configuredOrigins.length ? configuredOrigins : [
   'https://narsing-s.github.io',
-  'https://narsing-s.github.io/Life-Replay-',
   'http://localhost:4173',
   'http://localhost:4174',
   'http://localhost:3000'
@@ -45,13 +45,19 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
   next();
 });
-app.use(express.json({ limit: '2mb' }));
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+app.use(express.json({ limit: '10mb' }));
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d' }));
 app.use(express.static(__dirname, { extensions: ['html'] }));
 
 const upload = multer({
   storage: multer.diskStorage({ destination: (_, __, cb) => cb(null, UPLOAD_DIR), filename: (_, file, cb) => cb(null, `${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`) }),
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits: { fileSize: Number(process.env.MAX_UPLOAD_BYTES || 100 * 1024 * 1024) },
   fileFilter: (_, file, cb) => cb(null, /^(image\/(jpeg|png|webp|gif|heic|heif)|video\/|audio\/|application\/pdf)$/.test(file.mimetype))
 });
 const publicUser = row => ({ id: row.id, email: row.email, name: row.name, createdAt: row.created_at });
@@ -98,5 +104,55 @@ app.delete('/api/memories/:id', auth, (req, res) => {
 app.post('/api/share', auth, (req, res) => { const token = crypto.randomBytes(18).toString('base64url'); db.prepare('INSERT INTO share_links VALUES (?,?,?,?)').run(token, req.user.id, new Date().toISOString(), null); res.status(201).json({ token, url: `${req.protocol}://${req.get('host')}/share/${token}` }); });
 app.get('/api/share/:token', (req, res) => { const link = db.prepare('SELECT * FROM share_links WHERE token=?').get(req.params.token); if (!link) return res.status(404).json({ error: 'Story not found' }); const owner = db.prepare('SELECT id,name FROM users WHERE id=?').get(link.user_id); const memories = db.prepare('SELECT title,caption,place,date,media_url AS mediaUrl FROM memories WHERE user_id=? ORDER BY date DESC').all(link.user_id); res.json({ owner, memories }); });
 app.get('/share/:token', (_, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
+// Install the full v1 feature surface explicitly. This replaces the old fragile Express listen monkey-patch.
+featureRoutes({ app, db, auth });
+
+// Stable v1 compatibility endpoints used by the enhanced UI.
+app.get('/api/v1/export', auth, (req, res) => {
+  const memories = db.prepare('SELECT * FROM memories WHERE user_id=? ORDER BY date DESC, created_at DESC').all(req.user.id);
+  const profile = db.prepare('SELECT * FROM profiles WHERE user_id=?').get(req.user.id) || null;
+  const tags = db.prepare('SELECT * FROM tags WHERE user_id=?').all(req.user.id);
+  const people = db.prepare('SELECT * FROM people WHERE user_id=?').all(req.user.id);
+  const locations = db.prepare('SELECT * FROM locations WHERE user_id=?').all(req.user.id);
+  res.json({ exportedAt: new Date().toISOString(), user: publicUser(req.user), profile, memories, tags, people, locations });
+});
+
+app.post('/api/v1/ai/ask', auth, (req, res) => {
+  const question = String(req.body?.question || '').trim();
+  if (!question) return res.status(400).json({ error: 'question is required' });
+  const rows = db.prepare(`SELECT m.*, mm.summary, mm.category, mm.mood FROM memories m LEFT JOIN memory_meta mm ON mm.memory_id=m.id WHERE m.user_id=? AND COALESCE(mm.deleted_at,'')='' ORDER BY m.date DESC`).all(req.user.id);
+  const q = question.toLowerCase();
+  let selected = rows;
+  const year = q.match(/\b(20\d{2})\b/)?.[1];
+  const monthNames = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+  const month = monthNames.findIndex(m => q.includes(m));
+  if (year) selected = selected.filter(m => String(m.date).startsWith(year));
+  if (month >= 0) selected = selected.filter(m => Number(String(m.date).slice(5,7)) === month + 1);
+  const terms = q.replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(x => x.length > 2 && !['show','find','what','did','with','from','about','my','life','memories','memory','this','that','have'].includes(x));
+  if (terms.length) {
+    const filtered = selected.filter(m => terms.some(t => `${m.title} ${m.caption} ${m.place} ${m.summary||''} ${m.category||''} ${m.mood||''}`.toLowerCase().includes(t)));
+    if (filtered.length) selected = filtered;
+  }
+  const answer = selected.length
+    ? `I found ${selected.length} matching memor${selected.length === 1 ? 'y' : 'ies'}. ` + selected.slice(0,8).map(m => `${m.title} (${m.date}${m.place ? `, ${m.place}` : ''})`).join('; ')
+    : 'I could not find a matching memory in your timeline yet.';
+  res.json({ answer, count: selected.length, memories: selected.slice(0,50) });
+});
+
+app.get('/api/v1/map', auth, (req, res) => {
+  const locations = db.prepare(`SELECT DISTINCT COALESCE(mm.address,m.place) name, mm.lat, mm.lng, m.date, m.title FROM memories m LEFT JOIN memory_meta mm ON mm.memory_id=m.id WHERE m.user_id=? AND mm.deleted_at IS NULL AND (mm.lat IS NOT NULL OR mm.lng IS NOT NULL OR mm.address IS NOT NULL OR m.place<>'') ORDER BY m.date DESC`).all(req.user.id);
+  res.json({ locations });
+});
+
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'File is too large. Please choose an image/video/audio file within the upload limit.' });
+    return res.status(400).json({ error: err.message });
+  }
+  console.error(err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 app.use((req, res) => { if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'API route not found' }); res.sendFile(path.join(__dirname, 'index.html')); });
 app.listen(PORT, '0.0.0.0', () => console.log(`Life Replay listening on 0.0.0.0:${PORT}`));
