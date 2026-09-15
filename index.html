@@ -8,20 +8,27 @@
 <meta property="og:title" content="Life Replay — Turn your life into a story">
 <meta property="og:description" content="Collect moments, build your timeline and replay your year.">
 <title>Life Replay — Turn your life into a story</title>
-<link rel="manifest" href="./manifest.webmanifest">
+<link rel="manifest" href="./manifest.webmanifest?v=4">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,500;1,600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./style.css?v=4">
 </head>
 <body>
-<div id="app"><main style="min-height:100vh;display:grid;place-items:center;padding:24px;font-family:Arial,sans-serif;background:#09090d;color:#fff;text-align:center"><div><h1 style="font-size:42px;margin:0 0 12px">Life Replay</h1><p style="opacity:.75">Loading your memories…</p></div></main></div>
+<div id="app"><main id="boot" style="min-height:100vh;display:grid;place-items:center;padding:24px;font-family:Arial,sans-serif;background:#09090d;color:#fff;text-align:center"><div><h1 style="font-size:42px;margin:0 0 12px">Life Replay</h1><p>Loading your memories…</p></div></main></div>
 <script>
-window.addEventListener('error',function(e){
+(function(){
   var app=document.getElementById('app');
-  if(app && !app.dataset.ready) app.innerHTML='<main style="min-height:100vh;display:grid;place-items:center;padding:24px;font-family:Arial,sans-serif;background:#09090d;color:#fff;text-align:center"><div><h1>Life Replay</h1><p>We could not load the app correctly. Please refresh once.</p><small style="opacity:.6">'+String(e.message||'Application error').replace(/[<>]/g,'')+'</small></div></main>';
-});
+  var timer=setTimeout(function(){
+    if(app && app.querySelector('#boot')) app.innerHTML='<main style="min-height:100vh;display:grid;place-items:center;padding:24px;font-family:Arial,sans-serif;background:#09090d;color:#fff;text-align:center"><div><h1>Life Replay</h1><p>The app is taking longer than expected to load.</p><button onclick="location.reload()" style="padding:12px 20px;border:0;border-radius:10px;cursor:pointer">Refresh</button></div></main>';
+  },7000);
+  window.addEventListener('error',function(e){
+    clearTimeout(timer);
+    if(app && app.querySelector('#boot')) app.innerHTML='<main style="min-height:100vh;display:grid;place-items:center;padding:24px;font-family:Arial,sans-serif;background:#09090d;color:#fff;text-align:center"><div><h1>Life Replay</h1><p>We could not load the app correctly.</p><small style="opacity:.6">'+String(e.message||'Application error').replace(/[<>]/g,'')+'</small><br><button onclick="location.reload()" style="margin-top:16px;padding:12px 20px;border:0;border-radius:10px;cursor:pointer">Refresh</button></div></main>';
+  },true);
+  window.clearLifeReplayBoot=function(){clearTimeout(timer);if(app)app.dataset.ready='1';};
+})();
 </script>
-<script src="./app.js"></script>
+<script src="./app.js?v=4" onload="window.clearLifeReplayBoot&&window.clearLifeReplayBoot()" onerror="document.getElementById('app').innerHTML='<main style=\"min-height:100vh;display:grid;place-items:center;padding:24px;font-family:Arial,sans-serif;background:#09090d;color:#fff;text-align:center\"><div><h1>Life Replay</h1><p>Could not load app.js.</p><button onclick=\"location.reload()\" style=\"padding:12px 20px;border:0;border-radius:10px;cursor:pointer\">Refresh</button></div></main>'"></script>
 </body>
 </html>
