@@ -22,8 +22,17 @@ CREATE TABLE IF NOT EXISTS share_links (token TEXT PRIMARY KEY, user_id TEXT NOT
 `);
 
 const app = express();
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  next();
+});
 app.use(express.json({ limit: '2mb' }));
-app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d' }));
+app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', immutable: true }));
 app.use(express.static(__dirname, { extensions: ['html'] }));
 
 const upload = multer({
@@ -75,7 +84,7 @@ app.delete('/api/memories/:id', auth, (req, res) => {
   res.status(204).end();
 });
 app.post('/api/share', auth, (req, res) => {
-  const token = crypto.randomBytes(18).toString('base64url');
+  const token = crypto.randomBytes(24).toString('base64url');
   db.prepare('INSERT INTO share_links VALUES (?,?,?,?)').run(token, req.user.id, new Date().toISOString(), null);
   res.status(201).json({ token, url: `${req.protocol}://${req.get('host')}/share/${token}` });
 });
