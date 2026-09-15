@@ -4,11 +4,34 @@
 
 Life Replay is a mobile-first personal memory product for turning photos, videos, audio and life moments into a private, searchable visual timeline.
 
+> 🤖 **Life Replay Chatbot** — Ask questions about your own memories, timeline, people, places, dates and moments directly from the Life Replay assistant. The chatbot is designed to answer from your authenticated Life Replay data, not from another user's memories.
+
 ## Current product
 
 The existing **Memory Atlas** UI is intentionally preserved: dark editorial styling, gold accents, memory wall, timeline navigation, replay entry point, account controls and responsive mobile/desktop layout.
 
 The current backend provides authenticated users, user-scoped memories, media uploads, profile controls, favorites/pins, trash/recovery, tags, people, locations, sessions, sharing, audit records, AI-style timeline queries, export and health/readiness endpoints.
+
+## 🤖 Life Replay Chatbot
+
+The Life Replay chatbot is the natural-language assistant for your personal memory timeline.
+
+You can ask questions such as:
+
+- `What memories do I have from 2025?`
+- `Show my favorite memories.`
+- `What happened around Hyderabad?`
+- `What memories mention my family?`
+- `What did I save in January?`
+- `Which places appear most in my memories?`
+- `Tell me about this memory.`
+- `Find memories about my birthday.`
+
+The assistant uses authenticated, user-scoped timeline data. It must never expose another account's memories.
+
+### Chatbot status
+
+The current `/api/v1/ai/ask` capability provides authenticated timeline/search-style answers. It is **not yet a production LLM/vector-search system**. Production generative AI, embeddings, semantic search, AI summaries and AI-generated yearly/monthly reports remain roadmap work.
 
 ## Production test deployment
 
@@ -127,7 +150,7 @@ Run the following smoke tests before accepting a deployment:
 6. Create a small memory.
 7. Upload a photo under the upload limit.
 8. Query Timeline/Favorites/Trash/Map.
-9. Ask the timeline assistant a question about the test memory.
+9. Ask the Life Replay chatbot a question about the test memory.
 10. Export account data.
 11. Sign out and confirm protected endpoints require authentication.
 12. Register/login from a second browser or mobile device to confirm the API is not tied to one client.
@@ -169,6 +192,8 @@ There is intentionally no artificial per-account memory-count limit in the appli
 - `docs/ARCHITECTURE.md` — architecture and storage model
 - `docs/PRODUCTION-STATUS.md` — implemented vs remaining production work
 - `docs/TEST-MATRIX.md` — end-to-end test matrix
+- `docs/RELEASE-CHECKLIST.md` — deployment/release acceptance checklist
+- `docs/KNOWN-LIMITATIONS.md` — known product limitations
 - `docs/DEPLOYMENT.md` — deployment guidance
 - `docs/SECURITY-CONTROLS.md` — security controls
 - `docs/FEATURE-COVERAGE.md` — feature coverage
