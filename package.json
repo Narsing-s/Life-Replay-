@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "preview": "node server.js"
+    "preview": "node server.js",
+    "test": "node --test",
+    "check": "node --check server.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
