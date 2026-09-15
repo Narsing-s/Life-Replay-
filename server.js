@@ -10,6 +10,8 @@ const Database = require('better-sqlite3');
 const PORT = process.env.PORT || 4173;
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean);
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
@@ -22,6 +24,17 @@ CREATE TABLE IF NOT EXISTS share_links (token TEXT PRIMARY KEY, user_id TEXT NOT
 `);
 
 const app = express();
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin || ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin) || origin === `http://localhost:${PORT}`) {
+    if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  next();
+});
 app.use(express.json({ limit: '2mb' }));
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d' }));
 app.use(express.static(__dirname, { extensions: ['html'] }));
@@ -44,6 +57,7 @@ function auth(req, res, next) {
   catch { res.status(401).json({ error: 'Invalid or expired session' }); }
 }
 
+app.get('/api/config', (_, res) => res.json({ googleClientId: GOOGLE_CLIENT_ID }));
 app.get('/api/health', (_, res) => res.json({ ok: true, service: 'life-replay', time: new Date().toISOString() }));
 app.post('/api/auth/register', async (req, res) => {
   const { email, password, name } = req.body || {};
@@ -82,11 +96,10 @@ app.post('/api/share', auth, (req, res) => {
 app.get('/api/share/:token', (req, res) => {
   const link = db.prepare('SELECT * FROM share_links WHERE token=?').get(req.params.token);
   if (!link) return res.status(404).json({ error: 'Story not found' });
-  const user = db.prepare('SELECT id,name FROM users WHERE id=?').get(link.user_id);
+  const owner = db.prepare('SELECT id,name FROM users WHERE id=?').get(link.user_id);
   const memories = db.prepare('SELECT title,caption,place,date,media_url AS mediaUrl FROM memories WHERE user_id=? ORDER BY date DESC').all(link.user_id);
-  res.json({ owner: user, memories });
+  res.json({ owner, memories });
 });
-
 app.get('/share/:token', (_, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('*', (_, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.listen(PORT, () => console.log(`Life Replay listening on :${PORT}`));
