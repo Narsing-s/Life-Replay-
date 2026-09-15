@@ -1,0 +1,11 @@
+{
+  "name": "Life Replay",
+  "short_name": "Life Replay",
+  "description": "Your life, beautifully remembered.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#09090d",
+  "theme_color": "#09090d",
+  "icons": []
+}
