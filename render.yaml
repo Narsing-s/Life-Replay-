@@ -3,6 +3,10 @@ services:
     name: life-replay
     runtime: docker
     plan: free
+    repo: https://github.com/Narsing-s/Life-Replay-
+    branch: main
+    autoDeployTrigger: commit
+    renderSubdomainPolicy: enabled
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     envVars:
