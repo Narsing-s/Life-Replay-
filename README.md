@@ -20,25 +20,26 @@ The current frontend is the **Memory Atlas** experience:
 
 The production backend provides authenticated memory storage, image uploads, sharing and health checks.
 
-## GitHub Pages
+## GitHub Pages — current deployment
 
-For the static frontend, publish the repository directly from `main` / `/(root)` using **Deploy from a branch**. This avoids the previous Actions `configure-pages` integration failure.
+The repository contains a top-level `index.html`, so the simplest and most reliable GitHub Pages setup is **Deploy from a branch** using `main` and `/(root)`. GitHub recommends branch publishing for sites that do not need a custom build process. The previous Actions workflow failed before deployment because the repository Pages site was not enabled for the Actions publishing mode.
 
 Open repository Pages settings:
 
 `https://github.com/Narsing-s/Life-Replay-/settings/pages`
 
-Set:
+Set exactly:
 
 - **Source:** Deploy from a branch
 - **Branch:** `main`
 - **Folder:** `/(root)`
+- Click **Save**
 
-The expected project URL is:
+Expected project URL:
 
 `https://narsing-s.github.io/Life-Replay-/`
 
-GitHub Pages can take several minutes to publish after the source is configured or new commits are pushed.
+After changing the source, GitHub automatically builds when commits reach `main`. Allow several minutes for the first deployment.
 
 ## Production backend
 
