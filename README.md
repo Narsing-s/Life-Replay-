@@ -20,6 +20,20 @@ The current frontend is the **Memory Atlas** experience:
 
 The production backend provides authenticated memory storage, image uploads, sharing and health checks.
 
+## Deploy the backend to Render
+
+The repository includes a ready-to-use `render.yaml` Blueprint for the Node/Express backend, persistent SQLite storage and the `/api/health` health check.
+
+**Fastest option:** use the Render deployment button below. Render will read the Blueprint from this public repository and ask you to approve the resources before creating the service. citeturn0search0
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Narsing-s/Life-Replay-)
+
+After deployment, Render will provide an `*.onrender.com` service URL. The frontend is already configured to use `https://life-replay.onrender.com` when served from GitHub Pages; if Render assigns a different subdomain, update the `BACKEND` constant in `index.html` and the `ALLOWED_ORIGINS` value in `render.yaml` to match it.
+
+Alternatively, in Render choose **New → Blueprint**, connect this repository, keep the Blueprint path as `render.yaml`, review the service, and deploy it. Render's Blueprint flow provisions the resources declared in the YAML file. citeturn0search2
+
+The backend requires a generated production `JWT_SECRET`. The Blueprint already marks it with `generateValue: true`. `GOOGLE_CLIENT_ID` is optional and can be configured later.
+
 ## Open-source project files
 
 - [MIT License](LICENSE)
