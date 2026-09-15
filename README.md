@@ -2,102 +2,95 @@
 
 **Remember the way it felt.**
 
-Life Replay is a mobile-first memory product for turning photos and moments into a visual, searchable personal timeline.
+Life Replay is a mobile-first personal memory product for turning photos, videos, audio and life moments into a private, searchable visual timeline.
 
 ## Current product
 
-The current frontend is the **Memory Atlas** experience:
+The existing **Memory Atlas** UI is intentionally preserved: dark editorial styling, gold accents, memory wall, timeline navigation, replay entry point, account controls and responsive mobile/desktop layout.
 
-- Editorial home dashboard
-- Visual memory wall
-- Timeline / time-machine browsing
-- Replay viewer entry point
-- Search across memories, dates and places
-- Google Photos import entry point
-- Account/authentication entry points
-- Responsive desktop, tablet and mobile layout
-- Offline demo memories so the UI never depends on an API just to render
+The current backend provides authenticated users, user-scoped memories, media uploads, profile controls, favorites/pins, trash/recovery, tags, people, locations, sessions, sharing, audit records, AI-style timeline queries, export and health/readiness endpoints.
 
-The production backend provides authenticated memory storage, image uploads, sharing and health checks.
+## Production test deployment
 
-## Deploy the backend to Render
+The current test backend is deployed on SnapDeploy:
 
-The repository includes a ready-to-use `render.yaml` Blueprint for the Node/Express backend, persistent SQLite storage and the `/api/health` health check.
+`https://life-replay-api-91493.containers.snapdeploy.app`
 
-**Fastest option:** use the Render deployment button below. Render will read the Blueprint from this public repository and ask you to approve the resources before creating the service. citeturn0search0
+Health checks:
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Narsing-s/Life-Replay-)
+- `GET /api/health`
+- `GET /api/health/ready`
 
-After deployment, Render will provide an `*.onrender.com` service URL. The frontend is already configured to use `https://life-replay.onrender.com` when served from GitHub Pages; if Render assigns a different subdomain, update the `BACKEND` constant in `index.html` and the `ALLOWED_ORIGINS` value in `render.yaml` to match it.
-
-Alternatively, in Render choose **New → Blueprint**, connect this repository, keep the Blueprint path as `render.yaml`, review the service, and deploy it. Render's Blueprint flow provisions the resources declared in the YAML file. citeturn0search2
-
-The backend requires a generated production `JWT_SECRET`. The Blueprint already marks it with `generateValue: true`. `GOOGLE_CLIENT_ID` is optional and can be configured later.
-
-## Open-source project files
-
-- [MIT License](LICENSE)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Contributing Guide](CONTRIBUTING.md)
-- [Security Policy](SECURITY.md)
-- [Support Guide](SUPPORT.md)
-- [Changelog](CHANGELOG.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [API Reference](docs/API.md)
-- [Deployment Guide](docs/DEPLOYMENT.md)
-- [Testing Guide](docs/TESTING.md)
-
-## Quality and security automation
-
-Every push and pull request targeting `main` is checked by GitHub Actions for:
-
-- Node.js syntax validation
-- Automated API/authentication tests
-- High-severity production dependency vulnerabilities
-- Docker image build health
-- CodeQL security analysis
-- Dependency changes on pull requests
-
-Dependabot is configured for npm dependencies and GitHub Actions. These checks are intended to catch regressions and supply-chain risks before production deployment.
-
-## GitHub Pages
-
-The repository contains a top-level `index.html`, so the simplest GitHub Pages setup is **Deploy from a branch** using `main` and `/(root)`. GitHub recommends branch publishing when no custom build process is required. citeturn0search1
-
-Open repository Pages settings:
-
-`https://github.com/Narsing-s/Life-Replay-/settings/pages`
-
-Set:
-
-- **Source:** Deploy from a branch
-- **Branch:** `main`
-- **Folder:** `/(root)`
-
-Expected project URL:
+The GitHub Pages frontend is:
 
 `https://narsing-s.github.io/Life-Replay-/`
 
-GitHub Pages requires the entry file at the top level of the selected publishing source. This repository provides `index.html` and `.nojekyll` at the root. citeturn0search3turn0search5
+The enhanced frontend is configured to use the SnapDeploy backend when opened from GitHub Pages. The backend CORS allow-list must contain the browser origin exactly:
 
-## Production backend
+`https://narsing-s.github.io`
 
-The Node/Express backend supports:
+Do not include `/Life-Replay-` in the CORS origin because browser `Origin` headers contain the scheme and host, not the path.
 
-- Email/password registration and login
-- JWT sessions
-- SQLite persistence
-- Private per-user memories
-- Image uploads up to 25 MB
-- User-owned deletion of uploaded media
-- Public share-link tokens
-- Health endpoint
-- Docker deployment
-- Configurable `JWT_SECRET`, `PORT`, `DATA_DIR`, `GOOGLE_CLIENT_ID` and `ALLOWED_ORIGINS`
+## Core API
 
-See the [API Reference](docs/API.md) and [Deployment Guide](docs/DEPLOYMENT.md) for details.
+Authentication:
 
-## Run locally
+- `POST /api/auth/register` — `{ name, email, password }`
+- `POST /api/auth/login` — `{ email, password }`
+- `GET /api/me` — Bearer token
+- `GET /api/v1/profile` — Bearer token
+- `PATCH /api/v1/profile` — Bearer token
+- `GET /api/v1/sessions` — Bearer token
+- `POST /api/v1/auth/refresh` — Bearer token
+- `POST /api/v1/auth/logout-all` — Bearer token
+
+Memory operations:
+
+- `GET /api/v1/memories`
+- `POST /api/v1/memories`
+- `PATCH /api/v1/memories/:id`
+- `DELETE /api/v1/memories/:id` — moves a memory to trash
+- `POST /api/v1/memories/:id/restore`
+- `DELETE /api/v1/memories/:id/permanent`
+- `POST /api/v1/memories/:id/favorite`
+- `POST /api/v1/memories/:id/pin`
+- `POST /api/v1/memories/:id/media`
+
+Discovery/data:
+
+- Timeline and filtered memory queries
+- Search with `q`
+- Year/date filtering
+- Place/category filtering
+- People and tag filtering
+- Favorites and trash
+- Map/location data
+- JSON export
+- User-scoped AI/timeline questions
+
+Sharing and safety:
+
+- Public share-link support
+- Per-user authorization
+- Audit logging
+- Security headers
+- CORS handling
+- Upload type and size validation
+- Request/error handling
+
+## Media uploads
+
+The application accepts images, video, audio and PDF media. The normal `/api/memories` endpoint currently has a 100 MB application limit. The enhanced UI compresses large images before upload to reduce proxy failures while preserving the original media types for smaller files.
+
+For lifetime production storage, **do not treat the container filesystem as permanent storage**. Use PostgreSQL/managed database storage for metadata and durable object storage such as S3-compatible storage, Cloudflare R2 or another persistent provider for media.
+
+## External providers
+
+Google Photos and Apple Photos are intentionally shown as provider integrations rather than fake working imports. Full imports require the corresponding OAuth/API configuration and user authorization. A Google Client ID alone does not implement the complete Google Photos import flow.
+
+Voice-to-memory uses browser speech recognition where supported and converts the captured transcript into a memory draft.
+
+## Local development
 
 Requirements: Node.js 22+ and npm.
 
@@ -109,64 +102,123 @@ JWT_SECRET="replace-with-a-long-random-secret" npm start
 
 Open `http://localhost:4173`.
 
-Use `.env.example` as the starting point for local configuration. Never commit real secrets.
-
 ### Docker
 
 ```bash
 docker build -t life-replay .
-docker run -p 4173:4173 -e JWT_SECRET="replace-with-a-long-random-secret" -v life-replay-data:/app/data life-replay
+docker run -p 4173:4173 \
+  -e NODE_ENV=production \
+  -e JWT_SECRET="replace-with-a-long-random-secret" \
+  -v life-replay-data:/app/data \
+  life-replay
 ```
 
-The production image runs as a non-root user and exposes a container healthcheck. Production hosting must use persistent storage for the SQLite database and uploaded media, or replace this storage layer with managed PostgreSQL plus object storage.
+The container listens on `0.0.0.0` and uses the platform-provided `PORT` when supplied.
 
-## API overview
+## Testing after every deployment
 
-`GET /api/health`
+Run the following smoke tests before accepting a deployment:
 
-`GET /api/config`
+1. `GET /api/health` returns HTTP 200.
+2. `GET /api/health/ready` reports `database: true`.
+3. Register a new test account.
+4. Log in and retain the returned bearer token.
+5. Open Profile and save a bio.
+6. Create a small memory.
+7. Upload a photo under the upload limit.
+8. Query Timeline/Favorites/Trash/Map.
+9. Ask the timeline assistant a question about the test memory.
+10. Export account data.
+11. Sign out and confirm protected endpoints require authentication.
+12. Register/login from a second browser or mobile device to confirm the API is not tied to one client.
 
-`POST /api/auth/register` — `{ "name", "email", "password" }`
-
-`POST /api/auth/login` — `{ "email", "password" }`
-
-`GET /api/me` — Bearer token required
-
-`GET /api/memories` — Bearer token required
-
-`POST /api/memories` — multipart image upload, Bearer token required
-
-`DELETE /api/memories/:id` — Bearer token required
-
-`POST /api/share` — creates a public share token
-
-`GET /api/share/:token` — reads a public story
+See `docs/PRODUCTION-STATUS.md` and `docs/TEST-MATRIX.md` for the detailed checklist.
 
 ## Security
 
-- Passwords are bcrypt-hashed and never returned by the API.
-- JWTs are signed server-side; production must use a long random `JWT_SECRET`.
-- Memory listing and deletion are scoped to the authenticated user.
-- Uploaded filenames are replaced with random IDs.
-- Public links use high-entropy random tokens.
-- Public share endpoints do not expose passwords or account credentials.
-- Local database, upload and environment files are excluded from Git.
+- Passwords are bcrypt-hashed.
+- JWTs are signed server-side.
+- Production requires a non-default `JWT_SECRET`.
+- Memory queries are scoped to the authenticated user.
+- Upload filenames are generated server-side.
+- Public share tokens are random high-entropy values.
+- CORS is explicit.
+- Security response headers are enabled.
+- Never commit passwords, API keys, JWT secrets, private photos, databases or user-uploaded data.
 
-Never commit passwords, API keys, JWT secrets, private photos, databases, or user-uploaded data.
+## Important production limitations
 
-## Contributing
+The current SnapDeploy test deployment is suitable for end-to-end application testing, but the local SQLite database and container filesystem are not a complete durable-storage architecture for a lifetime-memory product. Before treating the service as a production backup of irreplaceable memories, migrate to:
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SUPPORT.md](SUPPORT.md) before opening an issue or pull request. Bug reports and feature requests have repository templates under `.github/ISSUE_TEMPLATE/`.
+1. Managed PostgreSQL.
+2. Durable object storage for all media.
+3. Signed media URLs.
+4. Automated database backups and restore tests.
+5. Background media processing and thumbnail generation.
+6. Distributed rate limiting/session storage.
+7. Email verification/password recovery delivery.
+8. Complete Google Photos and Apple Photos OAuth/import flows.
+9. Real AI provider integration with strict per-user authorization if generative AI is enabled.
+10. Production monitoring, alerting and disaster-recovery procedures.
+
+There is intentionally no artificial per-account memory-count limit in the application. Physical storage is finite and subject to the capacity, quota and cost of the selected database/object-storage provider; “unlimited” means no application-imposed memory-count cap, not literally infinite storage.
+
+## Documentation
+
+- `docs/API.md` — API reference
+- `docs/ARCHITECTURE.md` — architecture and storage model
+- `docs/PRODUCTION-STATUS.md` — implemented vs remaining production work
+- `docs/TEST-MATRIX.md` — end-to-end test matrix
+- `docs/DEPLOYMENT.md` — deployment guidance
+- `docs/SECURITY-CONTROLS.md` — security controls
+- `docs/FEATURE-COVERAGE.md` — feature coverage
+- `docs/QUALITY-GATES.md` — quality gates
+
+## Open-source project files
+
+- [MIT License](LICENSE)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Contributing Guide](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
+- [Support Guide](SUPPORT.md)
+- [Changelog](CHANGELOG.md)
 
 ## Roadmap
 
-1. Managed PostgreSQL + S3-compatible object storage
-2. Refresh-token rotation and secure httpOnly cookie sessions
-3. Email verification and password recovery
-4. EXIF extraction with explicit location consent
-5. AI captions, clustering and duplicate detection
-6. Thumbnail/video processing and cinematic replay generation
-7. Granular share permissions and expiring links
-8. Mobile background indexing
-9. Collaborative family/friend memories
-10. Viral yearly recap and referral campaigns
+### P0 — Complete the durable core
+
+- Managed PostgreSQL
+- Durable object storage
+- Secure session/refresh-token rotation
+- Email verification and password recovery delivery
+- Complete memory editing and media lifecycle
+- Backup/restore
+
+### P1 — Intelligence
+
+- Production AI provider integration
+- AI summaries/captions
+- Duplicate detection and media clustering
+- Semantic search/embeddings
+- Year-in-review and monthly reports
+- Relationship/timeline intelligence
+
+### P2 — Integrations and collaboration
+
+- Google Photos OAuth/import
+- Apple Photos integration where supported
+- Calendar synchronization
+- Family/friend collaboration
+- Comments/reactions
+- Granular share permissions and expiring links
+- Notifications/reminders
+
+### P3 — Production scale
+
+- Background job queue
+- Video transcoding/thumbnails
+- Adaptive media delivery
+- Monitoring and alerting
+- Disaster recovery
+- Mobile background indexing
+- Native/mobile packaging where required
