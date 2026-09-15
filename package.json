@@ -1,0 +1,10 @@
+{
+  "name": "life-replay",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Life Replay — turn your memories into a story.",
+  "scripts": {
+    "dev": "python3 -m http.server 4173",
+    "preview": "python3 -m http.server 4173"
+  }
+}
