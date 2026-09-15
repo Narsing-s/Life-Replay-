@@ -11,7 +11,7 @@ The current frontend is the **Memory Atlas** experience:
 - Editorial home dashboard
 - Visual memory wall
 - Timeline / time-machine browsing
-- Full-screen Replay viewer
+- Replay viewer entry point
 - Search across memories, dates and places
 - Google Photos import entry point
 - Account/authentication entry points
@@ -20,26 +20,33 @@ The current frontend is the **Memory Atlas** experience:
 
 The production backend provides authenticated memory storage, image uploads, sharing and health checks.
 
-## GitHub Pages — current deployment
+## Open-source project files
 
-The repository contains a top-level `index.html`, so the simplest and most reliable GitHub Pages setup is **Deploy from a branch** using `main` and `/(root)`. GitHub recommends branch publishing for sites that do not need a custom build process. The previous Actions workflow failed before deployment because the repository Pages site was not enabled for the Actions publishing mode.
+- [MIT License](LICENSE)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Contributing Guide](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [API Reference](docs/API.md)
+- [Deployment Guide](docs/DEPLOYMENT.md)
+
+## GitHub Pages
+
+The repository contains a top-level `index.html`, so the simplest GitHub Pages setup is **Deploy from a branch** using `main` and `/(root)`.
 
 Open repository Pages settings:
 
 `https://github.com/Narsing-s/Life-Replay-/settings/pages`
 
-Set exactly:
+Set:
 
 - **Source:** Deploy from a branch
 - **Branch:** `main`
 - **Folder:** `/(root)`
-- Click **Save**
 
 Expected project URL:
 
 `https://narsing-s.github.io/Life-Replay-/`
-
-After changing the source, GitHub automatically builds when commits reach `main`. Allow several minutes for the first deployment.
 
 ## Production backend
 
@@ -56,7 +63,29 @@ The Node/Express backend supports:
 - Docker deployment
 - Configurable `JWT_SECRET`, `PORT`, `DATA_DIR`, `GOOGLE_CLIENT_ID` and `ALLOWED_ORIGINS`
 
-### API
+See the [API Reference](docs/API.md) and [Deployment Guide](docs/DEPLOYMENT.md) for details.
+
+## Run locally
+
+Requirements: Node.js 22+ and npm.
+
+```bash
+npm install
+JWT_SECRET="replace-with-a-long-random-secret" npm start
+```
+
+Open `http://localhost:4173`.
+
+### Docker
+
+```bash
+docker build -t life-replay .
+docker run -p 4173:4173 -e JWT_SECRET="replace-with-a-long-random-secret" -v life-replay-data:/app/data life-replay
+```
+
+Production hosting must use persistent storage for the SQLite database and uploaded media, or replace this storage layer with managed PostgreSQL plus object storage.
+
+## API overview
 
 `GET /api/health`
 
@@ -78,24 +107,6 @@ The Node/Express backend supports:
 
 `GET /api/share/:token` — reads a public story
 
-## Run locally
-
-```bash
-npm install
-JWT_SECRET="replace-with-a-long-random-secret" npm start
-```
-
-Open `http://localhost:4173`.
-
-### Docker
-
-```bash
-docker build -t life-replay .
-docker run -p 4173:4173 -e JWT_SECRET="replace-with-a-long-random-secret" -v life-replay-data:/app/data life-replay
-```
-
-Production hosting must use a persistent volume for the SQLite database and uploaded media, or replace this storage layer with managed PostgreSQL plus object storage.
-
 ## Security
 
 - Passwords are bcrypt-hashed and never returned by the API.
@@ -104,6 +115,12 @@ Production hosting must use a persistent volume for the SQLite database and uplo
 - Uploaded filenames are replaced with random IDs.
 - Public links use high-entropy random tokens.
 - Public share endpoints do not expose passwords or account credentials.
+
+Never commit passwords, API keys, JWT secrets, private photos, databases, or user-uploaded data.
+
+## Contributing
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before opening an issue or pull request. Bug reports and feature requests have repository templates under `.github/ISSUE_TEMPLATE/`.
 
 ## Roadmap
 
