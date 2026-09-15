@@ -13,7 +13,7 @@ services:
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: ALLOWED_ORIGINS
-        value: https://life-replay.onrender.com
+        value: https://narsing-s.github.io,https://life-replay.onrender.com
     disk:
       name: life-replay-data
       mountPath: /app/data
