@@ -116,4 +116,4 @@ app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.listen(PORT, () => console.log(`Life Replay listening on :${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Life Replay listening on 0.0.0.0:${PORT}`));
