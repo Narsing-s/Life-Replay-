@@ -3,6 +3,7 @@ const Database = require('better-sqlite3');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const featureRoutes = require('./feature-routes');
+const productionHardening = require('./production-hardening');
 
 const originalListen = express.application.listen;
 let installed = false;
@@ -23,6 +24,7 @@ express.application.listen = function patchedListen(...args) {
       } catch { res.status(401).json({ error: 'Invalid or expired session' }); }
     };
     featureRoutes({ app: this, db, auth });
+    productionHardening({ app: this, db, auth, jwtSecret: secret });
   }
   return originalListen.apply(this, args);
 };
