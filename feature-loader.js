@@ -1,6 +1,6 @@
-// Feature routes are installed explicitly by server.js.
-// This preload also installs optional production integrations without changing
-// the existing feature-routes API surface.
+// Compatibility preload used by the existing npm scripts.
+// Production routes are installed before feature routes so security-sensitive
+// replacements such as rotating refresh tokens take precedence.
 const Module = require('module');
 const path = require('path');
 const originalLoad = Module._load;
@@ -12,8 +12,8 @@ Module._load = function(request, parent, isMain) {
     wrapped = true;
     const productionRoutes = require(path.join(path.dirname(parent.filename), 'production-routes'));
     return function(args) {
-      loaded(args);
       productionRoutes(args);
+      loaded(args);
     };
   }
   return loaded;
