@@ -61,6 +61,7 @@ npm run worker:media
 npm run worker:document
 npm run worker:ai
 npm run worker:notifications
+npm run worker:google-import
 npm run realtime
 ```
 
