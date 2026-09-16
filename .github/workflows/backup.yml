@@ -1,0 +1,42 @@
+name: Production database backup
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PGHOST: ${{ secrets.LIFEOS_PGHOST }}
+      PGPORT: ${{ secrets.LIFEOS_PGPORT }}
+      PGUSER: ${{ secrets.LIFEOS_PGUSER }}
+      PGPASSWORD: ${{ secrets.LIFEOS_PGPASSWORD }}
+      PGDATABASE: ${{ secrets.LIFEOS_PGDATABASE }}
+      S3_BUCKET: ${{ secrets.LIFEOS_BACKUP_BUCKET }}
+      S3_ENDPOINT: ${{ secrets.LIFEOS_BACKUP_ENDPOINT }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.LIFEOS_BACKUP_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.LIFEOS_BACKUP_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client and AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client python3-pip
+          python3 -m pip install --user awscli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Dump database
+        run: |
+          mkdir -p backup
+          pg_dump --format=custom --no-owner --no-privileges > "backup/lifereplay-$(date -u +%Y%m%dT%H%M%SZ).dump"
+      - name: Upload off-site backup
+        run: |
+          aws --endpoint-url "$S3_ENDPOINT" s3 cp backup/ "s3://$S3_BUCKET/lifereplay/" --recursive --only-show-errors
+      - name: Verify dump is non-empty
+        run: test -s backup/*.dump
