@@ -5,55 +5,70 @@ Updated: 2026-09-16
 ## Current deployment
 
 - Frontend: GitHub Pages
-- Backend: SnapDeploy
-- Runtime: Node/Express compatibility application
-- Current test deployment database: SQLite
-- Current test deployment media: container filesystem
+- Backend test deployment: SnapDeploy
+- Runtime: Node/Express
+- Current SnapDeploy compatibility storage: SQLite + container filesystem
+- Current SnapDeploy URL: `https://life-replay-api-91493.containers.snapdeploy.app`
 
-## Production platform added in this branch
+The current hosted backend is for application testing. It is not yet the final durable lifetime-memory deployment.
 
-| Area | Status |
+## Production-hardening capabilities in this branch
+
+| Capability | Status |
 |---|---|
-| SQLite compatibility | ✅ Existing runtime retained |
-| PostgreSQL | 🟡 Schema, pgvector schema and migration tool added; API cutover required |
-| Object storage | 🟡 S3/R2/MinIO adapter and migration tool added; upload cutover required |
-| Private media | 🟡 Signed-storage capability added; legacy public `/uploads` must be retired after cutover |
-| Off-site backups | 🟡 Encrypted scheduled PostgreSQL backup workflow added; GitHub secrets required |
-| Restore testing | 🟡 SQLite verifier and isolated PostgreSQL restore drill added |
-| Distributed rate limiting | 🟡 Redis implementation added; production Redis required |
-| Email verification | 🟡 Persistent verification state and token flow added; email provider required |
-| Password reset | 🟡 Single-use reset flow + session revocation added; email provider required |
-| Refresh token rotation | ✅ Rotation/revocation endpoint added |
-| Google OAuth | 🟡 Encrypted OAuth foundation added; provider APIs/import workers still required |
-| LLM | 🟡 Authenticated provider integration with timeout added; provider key/budget required |
-| Embeddings | 🟡 Provider integration + pgvector schema added; retrieval cutover required |
-| Video processing | 🟡 Durable worker + ffmpeg hook added; worker deployment required |
-| Malware scanning | 🟡 ClamAV hook added; scanner deployment required |
-| OCR | 🟡 Document worker hook added; OCR runtime/provider required |
-| Notifications | 🟡 Durable notification worker added; provider configuration required |
-| WebSocket | 🟡 Authenticated Redis-backed realtime gateway added; separate deployment/client wiring required |
-| Observability | 🟡 Structured logs + Prometheus metrics added; monitoring exporter/alerts required |
-| CI | ✅ Syntax, tests, audit, Docker and compose validation added |
-| Multi-instance | 🟡 Shared DB/storage/Redis/queue foundations added; complete repository/upload cutover required |
+| PostgreSQL schema + pgvector | ✅ Added |
+| Ordered PostgreSQL migrations | ✅ Added |
+| S3/R2/MinIO storage adapter | ✅ Added |
+| Private/signed media capability | ✅ Added |
+| Redis/BullMQ queues | ✅ Added |
+| Media processing lifecycle | ✅ Added |
+| Document/OCR worker | ✅ Added; OCR provider required |
+| Google Photos OAuth/import pipeline | ✅ Added; provider credentials required |
+| AI/embedding provider integration | ✅ Added; provider credentials required |
+| Notification worker | ✅ Added |
+| Realtime gateway | ✅ Added; client deployment still required |
+| Backup/checksum/retention tooling | ✅ Added |
+| Restore-drill tooling | ✅ Added |
+| Orphan-media cleanup | ✅ Added; dry-run by default |
+| Stale-job reconciliation | ✅ Added |
+| Production doctor/preflight | ✅ Added |
+| CI/security validation | ✅ Added |
+| Native mobile client | 🟡 Not yet shipped |
+| Native desktop client | 🟡 Not yet shipped |
 
-## Important durability statement
+## Durable production cutover
 
-The current SnapDeploy instance still uses SQLite and local filesystem media. It is **not yet a durable lifetime-memory deployment**. The new PostgreSQL/object-storage infrastructure must be configured and the existing synchronous SQLite route layer must be migrated before multiple API replicas are enabled.
+Before calling the service a durable lifetime-memory system:
 
-## Remaining product work
+1. Deploy the PostgreSQL production runtime.
+2. Configure Redis.
+3. Configure S3/R2/MinIO object storage.
+4. Run ordered database migrations.
+5. Move all media writes away from the local filesystem.
+6. Enable authenticated private media access.
+7. Deploy long-running workers.
+8. Configure backups and off-site backup verification.
+9. Run `npm run doctor`.
+10. Perform a restore drill.
+11. Test the browser against the deployed API.
+12. Verify a second API instance can read the same user data.
 
-- Complete asynchronous PostgreSQL repository/service cutover.
-- Route all uploads through S3/R2/MinIO and remove public filesystem media.
-- Add authenticated signed-media access and cleanup/orphan reconciliation.
-- Add image thumbnails, EXIF consent handling, optimization and quarantine state.
-- Complete Google Photos import, Calendar/Drive sync and provider-specific retry jobs.
-- Add compliant regional finance provider only after provider selection and consent requirements are defined.
-- Add hybrid PostgreSQL full-text + pgvector retrieval.
-- Add AI summaries, captions, replay reports and explicit per-user cost/rate budgets.
-- Add collaboration permissions UI, comments/reactions, protected/expiring shares and QR cards.
-- Add browser/mobile E2E coverage and load/failure testing.
-- Add secret/dependency/container scanning and a documented RPO/RTO disaster-recovery runbook.
+## Hosting
 
-## Production release gate
+The repository is prepared for Docker-based hosting and includes `render.yaml` plus deployment documentation. The repository connection itself does not have credentials to create a service in an external hosting account, so no new external service is claimed as deployed unless its URL is actually verified.
 
-Do not advertise the service as a durable lifetime-memory service until `npm run doctor` passes against real PostgreSQL/Redis, media survives an API restart from object storage, a second API instance can access the same user data, an encrypted off-site backup is restored successfully, and the browser E2E suite passes.
+See `docs/DEPLOYMENT.md` for the current SnapDeploy deployment, Render/Docker deployment path and durable production architecture.
+
+## Remaining work
+
+- Complete PostgreSQL repository/service cutover for every feature route.
+- Complete all frontend integrations with realtime/job status.
+- Add native mobile and desktop clients.
+- Complete provider-specific Calendar/Drive integrations.
+- Add full collaboration/share-permission UI.
+- Complete browser E2E and load/failure testing.
+- Finish production monitoring/alerting and documented RPO/RTO operations.
+
+## Release gate
+
+Do not advertise the current SnapDeploy SQLite deployment as a durable backup of irreplaceable memories. The durable release gate requires PostgreSQL, Redis, object storage, successful backups/restores, worker processing, multi-instance validation and browser E2E verification.
