@@ -1,7 +1,6 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const crypto = require('crypto');
 const multer = require('multer');
 const { sha256 } = require('./production-services');
 
@@ -19,10 +18,11 @@ function installProductionDocumentRoutes({ app, q, auth, id, storage, enqueue })
     const documentId = id();
     const mediaId = id();
     const checksum = sha256(fs.readFileSync(req.file.path));
+    let stored = null;
     try {
       const duplicate = await q('SELECT id FROM media WHERE user_id=$1 AND checksum=$2 LIMIT 1', [req.user.id, checksum]);
       if (duplicate.rowCount) return res.status(409).json({ error: 'This document is already uploaded', mediaId: duplicate.rows[0].id });
-      const stored = await storage.putFile({ userId: req.user.id, id: mediaId, filePath: req.file.path, originalName: req.file.originalname, mimeType: req.file.mimetype, checksum });
+      stored = await storage.putFile({ userId: req.user.id, id: mediaId, filePath: req.file.path, originalName: req.file.originalname, mimeType: req.file.mimetype, checksum });
       await q('INSERT INTO memories(id,user_id,title,caption,place,date,media_url,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,NOW())', [memoryId, req.user.id, text(req.body?.title, 200) || req.file.originalname, text(req.body?.caption, 2000), text(req.body?.place, 500), /^\d{4}-\d{2}-\d{2}$/.test(req.body?.date || '') ? req.body.date : new Date().toISOString().slice(0, 10), stored.key]);
       await q('INSERT INTO memory_meta(memory_id,source,category,summary) VALUES($1,\'document\',\'document\',\'\') ON CONFLICT DO NOTHING', [memoryId]);
       await q('INSERT INTO media(id,memory_id,user_id,original_name,mime_type,size,storage_path,checksum,created_at,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,NOW(),\'queued\')', [mediaId, memoryId, req.user.id, req.file.originalname, req.file.mimetype, req.file.size, stored.key, checksum]);
@@ -30,13 +30,13 @@ function installProductionDocumentRoutes({ app, q, auth, id, storage, enqueue })
       try {
         await enqueue('document-processing', { documentId, memoryId, userId: req.user.id, objectKey: stored.key, mimeType: req.file.mimetype }, { jobId: `document-${documentId}` });
       } catch (error) {
-        await q('UPDATE documents SET status=$1,error=$2,updated_at=NOW() WHERE id=$3', ['failed', String(error.message).slice(0, 2000), documentId]);
-        throw error;
+        await q('DELETE FROM memories WHERE id=$1 AND user_id=$2', [memoryId, req.user.id]).catch(() => {});
+        await storage.remove(stored.key).catch(() => {});
+        return res.status(503).json({ error: 'Document queue is unavailable' });
       }
       res.status(202).json({ document: { id: documentId, memoryId, status: 'queued' } });
     } catch (error) {
-      try { fs.unlinkSync(req.file.path); } catch {}
-      await storage.remove?.(memoryId).catch?.(() => {});
+      if (stored?.key) await storage.remove(stored.key).catch(() => {});
       return next(error);
     } finally {
       try { fs.unlinkSync(req.file.path); } catch {}
