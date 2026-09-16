@@ -32,8 +32,11 @@ jobs:
           sudo apt-get install -y postgresql-client python3-pip gnupg
           python3 -m pip install --user awscli
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Validate backup secret
-        run: test -n "$BACKUP_PASSPHRASE"
+      - name: Validate backup secrets
+        run: |
+          test -n "$BACKUP_PASSPHRASE"
+          test -n "$S3_BUCKET"
+          test -n "$S3_ENDPOINT"
       - name: Dump database
         run: |
           mkdir -p backup
@@ -45,4 +48,16 @@ jobs:
           gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" --symmetric --cipher-algo AES256 --output backup/lifereplay.dump.gpg backup/lifereplay.dump
           rm -f backup/lifereplay.dump
       - name: Upload encrypted off-site backup
-        run: aws --endpoint-url "$S3_ENDPOINT" s3 cp backup/lifereplay.dump.gpg "s3://$S3_BUCKET/lifereplay/$(date -u +%Y%m%dT%H%M%SZ).dump.gpg" --only-show-errors
+        run: |
+          key="lifereplay/$(date -u +%Y%m%dT%H%M%SZ).dump.gpg"
+          echo "BACKUP_KEY=$key" >> "$GITHUB_ENV"
+          aws --endpoint-url "$S3_ENDPOINT" s3 cp backup/lifereplay.dump.gpg "s3://$S3_BUCKET/$key" --only-show-errors
+      - name: Verify uploaded backup can be decrypted and inspected
+        run: |
+          mkdir -p verify
+          aws --endpoint-url "$S3_ENDPOINT" s3 cp "s3://$S3_BUCKET/$BACKUP_KEY" verify/lifereplay.dump.gpg --only-show-errors
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" --decrypt --output verify/lifereplay.dump verify/lifereplay.dump.gpg
+          test -s verify/lifereplay.dump
+          pg_restore --list verify/lifereplay.dump > verify/contents.txt
+          grep -q 'TABLE DATA' verify/contents.txt
+          rm -rf verify
