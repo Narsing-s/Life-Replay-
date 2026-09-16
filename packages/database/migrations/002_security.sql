@@ -1,5 +1,5 @@
--- API transactions should execute: SET LOCAL app.user_id = '<authenticated-user-id>' before queries.
--- FORCE RLS prevents accidental bypass by application roles.
+-- API transactions should execute: SET LOCAL app.user_id = '<authenticated-user-id>' before user-scoped queries.
+-- Login/token exchange can temporarily use SET LOCAL app.auth_phase = 'true' in its dedicated transaction.
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE memories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -27,7 +27,7 @@ ALTER TABLE account_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE integrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE import_jobs ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY users_isolation ON users USING (id=current_setting('app.user_id',true));
+CREATE POLICY users_isolation ON users USING (id=current_setting('app.user_id',true) OR current_setting('app.auth_phase',true)='true');
 CREATE POLICY memories_isolation ON memories USING (user_id=current_setting('app.user_id',true));
 CREATE POLICY profiles_isolation ON profiles USING (user_id=current_setting('app.user_id',true));
 CREATE POLICY sessions_isolation ON sessions USING (user_id=current_setting('app.user_id',true));
@@ -54,5 +54,4 @@ CREATE POLICY account_tokens_isolation ON account_tokens USING (user_id=current_
 CREATE POLICY integrations_isolation ON integrations USING (user_id=current_setting('app.user_id',true));
 CREATE POLICY import_jobs_isolation ON import_jobs USING (user_id=current_setting('app.user_id',true));
 
--- Search index used by the future PostgreSQL repository.
 CREATE INDEX IF NOT EXISTS idx_memories_fts ON memories USING GIN (to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(caption,'') || ' ' || coalesce(place,'')));
