@@ -8,17 +8,28 @@
     "start": "npm run preflight && node -r ./feature-loader.js server.js",
     "preview": "npm run preflight && node -r ./feature-loader.js server.js",
     "test": "node --test",
-    "check": "node --check server.js && node --check security.js && node --check feature-loader.js && node --check feature-routes.js && node --check production-services.js && node --check production-routes.js && node --check scripts/preflight.js && node --check scripts/backup.js && node --check scripts/start-production.js && node --check scripts/production-doctor.js && node --check scripts/restore-check.js",
+    "check": "node --check server.js && node --check security.js && node --check feature-loader.js && node --check feature-routes.js && node --check production-services.js && node --check production-routes.js && node --check platform-config.js && node --check storage-adapter.js && node --check queue-adapter.js && node --check observability.js && node --check scripts/preflight.js && node --check scripts/backup.js && node --check scripts/start-production.js && node --check scripts/production-doctor.js && node --check scripts/restore-check.js && node --check scripts/verify-backup.js",
     "preflight": "node scripts/preflight.js",
     "backup": "node scripts/backup.js",
     "doctor": "node scripts/production-doctor.js",
-    "restore-check": "node scripts/restore-check.js"
+    "restore-check": "node scripts/restore-check.js",
+    "verify-backup": "node scripts/verify-backup.js",
+    "worker:media": "node workers/media-worker.js",
+    "worker:ai": "node workers/ai-worker.js",
+    "worker:notifications": "node workers/notification-worker.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.879.0",
+    "@aws-sdk/s3-request-presigner": "^3.879.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3",
+    "bullmq": "^5.58.0",
     "express": "^5.1.0",
+    "ioredis": "^5.7.0",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "pg": "^8.16.3",
+    "pino": "^9.9.0",
+    "prom-client": "^15.1.3"
   }
 }
