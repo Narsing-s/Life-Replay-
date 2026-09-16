@@ -9,7 +9,8 @@
     "preview": "node -r ./feature-loader.js server.js",
     "test": "node --test",
     "check": "node --check server.js && node --check feature-loader.js && node --check feature-routes.js",
-    "preflight": "node scripts/preflight.js"
+    "preflight": "node scripts/preflight.js",
+    "backup": "node scripts/backup.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
