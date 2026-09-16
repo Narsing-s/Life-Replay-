@@ -7,12 +7,15 @@ Module._load = function(request, parent, isMain) {
   const loaded = originalLoad.apply(this, arguments);
   if (!wrapped && request === './production-extended-routes' && parent && path.basename(parent.filename) === 'server-production-v2.js') {
     wrapped = true;
-    const integrations = require(path.join(path.dirname(parent.filename), 'production-integrations'));
+    const base = path.dirname(parent.filename);
+    const integrations = require(path.join(base, 'production-integrations'));
+    const documents = require(path.join(base, 'production-document-routes'));
     return {
       ...loaded,
       installProductionExtendedRoutes(args) {
         loaded.installProductionExtendedRoutes(args);
         integrations.installProductionIntegrations(args);
+        documents.installProductionDocumentRoutes(args);
       }
     };
   }
