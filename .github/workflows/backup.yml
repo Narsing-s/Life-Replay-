@@ -23,20 +23,26 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.LIFEOS_BACKUP_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.LIFEOS_BACKUP_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: auto
+      BACKUP_PASSPHRASE: ${{ secrets.LIFEOS_BACKUP_PASSPHRASE }}
     steps:
       - uses: actions/checkout@v4
       - name: Install PostgreSQL client and AWS CLI
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client python3-pip
+          sudo apt-get install -y postgresql-client python3-pip gnupg
           python3 -m pip install --user awscli
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Validate backup secret
+        run: test -n "$BACKUP_PASSPHRASE"
       - name: Dump database
         run: |
           mkdir -p backup
-          pg_dump --format=custom --no-owner --no-privileges > "backup/lifereplay-$(date -u +%Y%m%dT%H%M%SZ).dump"
-      - name: Upload off-site backup
+          pg_dump --format=custom --no-owner --no-privileges > backup/lifereplay.dump
+          test -s backup/lifereplay.dump
+      - name: Encrypt backup
         run: |
-          aws --endpoint-url "$S3_ENDPOINT" s3 cp backup/ "s3://$S3_BUCKET/lifereplay/" --recursive --only-show-errors
-      - name: Verify dump is non-empty
-        run: test -s backup/*.dump
+          umask 077
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" --symmetric --cipher-algo AES256 --output backup/lifereplay.dump.gpg backup/lifereplay.dump
+          rm -f backup/lifereplay.dump
+      - name: Upload encrypted off-site backup
+        run: aws --endpoint-url "$S3_ENDPOINT" s3 cp backup/lifereplay.dump.gpg "s3://$S3_BUCKET/lifereplay/$(date -u +%Y%m%dT%H%M%SZ).dump.gpg" --only-show-errors
