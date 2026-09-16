@@ -1,0 +1,58 @@
+-- API transactions should execute: SET LOCAL app.user_id = '<authenticated-user-id>' before queries.
+-- FORCE RLS prevents accidental bypass by application roles.
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE memories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE memory_meta ENABLE ROW LEVEL SECURITY;
+ALTER TABLE media ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE memory_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE people ENABLE ROW LEVEL SECURITY;
+ALTER TABLE memory_people ENABLE ROW LEVEL SECURITY;
+ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE memory_locations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shares ENABLE ROW LEVEL SECURITY;
+ALTER TABLE share_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE collaborators ENABLE ROW LEVEL SECURITY;
+ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE embeddings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE replays ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE account_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE integrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE import_jobs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY users_isolation ON users USING (id=current_setting('app.user_id',true));
+CREATE POLICY memories_isolation ON memories USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY profiles_isolation ON profiles USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY sessions_isolation ON sessions USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY memory_meta_isolation ON memory_meta USING (EXISTS (SELECT 1 FROM memories m WHERE m.id=memory_meta.memory_id AND m.user_id=current_setting('app.user_id',true)));
+CREATE POLICY media_isolation ON media USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY tags_isolation ON tags USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY memory_tags_isolation ON memory_tags USING (EXISTS (SELECT 1 FROM memories m WHERE m.id=memory_tags.memory_id AND m.user_id=current_setting('app.user_id',true)));
+CREATE POLICY people_isolation ON people USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY memory_people_isolation ON memory_people USING (EXISTS (SELECT 1 FROM memories m WHERE m.id=memory_people.memory_id AND m.user_id=current_setting('app.user_id',true)));
+CREATE POLICY locations_isolation ON locations USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY memory_locations_isolation ON memory_locations USING (EXISTS (SELECT 1 FROM memories m WHERE m.id=memory_locations.memory_id AND m.user_id=current_setting('app.user_id',true)));
+CREATE POLICY shares_isolation ON shares USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY share_items_isolation ON share_items USING (EXISTS (SELECT 1 FROM shares s WHERE s.id=share_items.share_id AND s.user_id=current_setting('app.user_id',true)));
+CREATE POLICY collaborators_isolation ON collaborators USING (owner_id=current_setting('app.user_id',true));
+CREATE POLICY comments_isolation ON comments USING (user_id=current_setting('app.user_id',true) OR EXISTS (SELECT 1 FROM memories m WHERE m.id=comments.memory_id AND m.user_id=current_setting('app.user_id',true)));
+CREATE POLICY reactions_isolation ON reactions USING (user_id=current_setting('app.user_id',true) OR EXISTS (SELECT 1 FROM memories m WHERE m.id=reactions.memory_id AND m.user_id=current_setting('app.user_id',true)));
+CREATE POLICY calendar_isolation ON calendar_events USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY notifications_isolation ON notifications USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY ai_jobs_isolation ON ai_jobs USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY embeddings_isolation ON embeddings USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY replays_isolation ON replays USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY audit_isolation ON audit_logs USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY account_tokens_isolation ON account_tokens USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY integrations_isolation ON integrations USING (user_id=current_setting('app.user_id',true));
+CREATE POLICY import_jobs_isolation ON import_jobs USING (user_id=current_setting('app.user_id',true));
+
+-- Search index used by the future PostgreSQL repository.
+CREATE INDEX IF NOT EXISTS idx_memories_fts ON memories USING GIN (to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(caption,'') || ' ' || coalesce(place,'')));
