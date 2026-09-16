@@ -1,4 +1,4 @@
-const { Worker } = require('bullmq');
+const { Worker, Queue } = require('bullmq');
 const IORedis = require('ioredis');
 const { Pool } = require('pg');
 const crypto = require('crypto');
@@ -11,6 +11,7 @@ if (!process.env.REDIS_URL) { console.error('REDIS_URL is required for Google im
 if (!process.env.DATABASE_URL) { console.error('DATABASE_URL is required for Google import worker'); process.exit(1); }
 const connection = new IORedis(process.env.REDIS_URL, { maxRetriesPerRequest: null });
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: Number(process.env.GOOGLE_IMPORT_PG_POOL_MAX || 3) });
+const mediaQueue = new Queue('media-processing', { connection, defaultJobOptions: { attempts: 5, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: { count: 1000 }, removeOnFail: { count: 5000 } } });
 const storage = createStorage();
 const id = () => crypto.randomUUID();
 const text = (v, max = 5000) => String(v ?? '').trim().slice(0, max);
@@ -82,18 +83,24 @@ async function importItem(jobId, userId, accessToken, item) {
   const memoryId = id();
   const title = text(item.filename, 200) || 'Imported memory';
   const caption = text(item.description, 2000);
-  const stored = await storage.putBuffer({ userId, id: memoryId, buffer: downloaded.buffer, originalName: filename(item, downloaded.mime), mimeType: downloaded.mime, checksum });
-  await pool.query('BEGIN');
+  const originalName = filename(item, downloaded.mime);
+  const stored = await storage.putBuffer({ userId, id: memoryId, buffer: downloaded.buffer, originalName, mimeType: downloaded.mime, checksum });
+  const client = await pool.connect();
   try {
-    await pool.query('INSERT INTO memories(id,user_id,title,caption,place,date,media_url,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,NOW())', [memoryId, userId, title, caption, '', date, stored.key]);
-    await pool.query('INSERT INTO memory_meta(memory_id,source,category,summary) VALUES($1,\'google-photos\',\'memory\',\'\') ON CONFLICT DO NOTHING', [memoryId]);
-    await pool.query('INSERT INTO media(id,memory_id,user_id,original_name,mime_type,size,storage_path,checksum,created_at,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,NOW(),\'queued\')', [id(), memoryId, userId, filename(item, downloaded.mime), downloaded.mime, downloaded.buffer.length, stored.key, checksum]);
-    await pool.query('INSERT INTO import_items(id,job_id,user_id,provider,provider_id,memory_id,checksum,status,metadata) VALUES($1,$2,$3,\'google\',$4,$5,$6,\'imported\',$7::jsonb)', [id(), jobId, userId, item.id, memoryId, checksum, JSON.stringify({ filename: item.filename || null, creationTime: created })]);
-    await pool.query('COMMIT');
+    await client.query('BEGIN');
+    await client.query('INSERT INTO memories(id,user_id,title,caption,place,date,media_url,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,NOW())', [memoryId, userId, title, caption, '', date, stored.key]);
+    await client.query('INSERT INTO memory_meta(memory_id,source,category,summary) VALUES($1,\'google-photos\',\'memory\',\'\') ON CONFLICT DO NOTHING', [memoryId]);
+    const mediaId = id();
+    await client.query('INSERT INTO media(id,memory_id,user_id,original_name,mime_type,size,storage_path,checksum,created_at,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,NOW(),\'queued\')', [mediaId, memoryId, userId, originalName, downloaded.mime, downloaded.buffer.length, stored.key, checksum]);
+    await client.query('INSERT INTO import_items(id,job_id,user_id,provider,provider_id,memory_id,checksum,status,metadata) VALUES($1,$2,$3,\'google\',$4,$5,$6,\'imported\',$7::jsonb)', [id(), jobId, userId, item.id, memoryId, checksum, JSON.stringify({ filename: item.filename || null, creationTime: created })]);
+    await client.query('COMMIT');
+    await mediaQueue.add('media-processing', { memoryId, userId, objectKey: stored.key, mimeType: downloaded.mime, checksum }, { jobId: `media-${memoryId}` });
   } catch (error) {
-    await pool.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     await storage.remove(stored.key).catch(() => {});
     throw error;
+  } finally {
+    client.release();
   }
   return { imported: true, skipped: false, memoryId };
 }
@@ -107,21 +114,23 @@ const worker = new Worker('google-import', async job => {
     if (!state.rowCount) throw new Error('Import job not found');
     await pool.query('UPDATE import_jobs SET status=$1,started_at=COALESCE(started_at,NOW()),updated_at=NOW() WHERE id=$2', ['running', importJobId]);
     let cursor = state.rows[0].cursor || null;
-    let imported = 0, skipped = 0;
+    let imported = 0, skipped = 0, processed = 0;
     do {
       const page = await listPage(accessToken, cursor);
       for (const item of page.mediaItems || []) {
         const result = await importItem(importJobId, userId, accessToken, item);
+        processed++;
         imported += result.imported ? 1 : 0;
         skipped += result.skipped ? 1 : 0;
+        await pool.query('UPDATE import_jobs SET cursor=$1,processed_count=$2,imported_count=$3,skipped_count=$4,updated_at=NOW() WHERE id=$5', [page.nextPageToken || null, processed, imported, skipped, importJobId]);
       }
       cursor = page.nextPageToken || null;
-      await pool.query('UPDATE import_jobs SET cursor=$1,processed_count=processed_count+$2,imported_count=imported_count+$2,skipped_count=skipped_count+$3,updated_at=NOW() WHERE id=$4', [cursor, imported ? 1 : 0, skipped ? 1 : 0, importJobId]);
+      if (!page.mediaItems?.length) await pool.query('UPDATE import_jobs SET cursor=$1,updated_at=NOW() WHERE id=$2', [cursor, importJobId]);
       if (!cursor) break;
     } while (true);
     await pool.query('UPDATE import_jobs SET status=$1,completed_at=NOW(),updated_at=NOW() WHERE id=$2', ['completed', importJobId]);
-    await lifecycle(job, 'completed', { result: { importJobId, imported, skipped } });
-    return { imported, skipped, completedAt: new Date().toISOString() };
+    await lifecycle(job, 'completed', { result: { importJobId, imported, skipped, processed } });
+    return { imported, skipped, processed, completedAt: new Date().toISOString() };
   } catch (error) {
     await pool.query('UPDATE import_jobs SET status=$1,error=$2,updated_at=NOW() WHERE id=$3', ['failed', String(error.message).slice(0, 2000), importJobId]).catch(() => {});
     await lifecycle(job, 'failed', { error: String(error.message).slice(0, 2000) }).catch(() => {});
@@ -131,7 +140,7 @@ const worker = new Worker('google-import', async job => {
 
 worker.on('failed', () => jobFailures.inc({ queue: 'google-import' }));
 worker.on('error', err => console.error('google import worker error', err));
-async function shutdown() { await worker.close(); await connection.quit(); await pool.end(); }
+async function shutdown() { await worker.close(); await mediaQueue.close(); await connection.quit(); await pool.end(); }
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 console.log('Life Replay Google Photos import worker started');
