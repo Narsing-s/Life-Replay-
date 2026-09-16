@@ -33,12 +33,12 @@ async function lifecycle(job, status, extra = {}) {
     VALUES($1,$2,'document-processing',$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,CASE WHEN $5='running' THEN NOW() ELSE NULL END,CASE WHEN $5 IN ('completed','failed') THEN NOW() ELSE NULL END,NOW())
     ON CONFLICT(queue,external_job_id) WHERE external_job_id IS NOT NULL
     DO UPDATE SET status=EXCLUDED.status,attempts=EXCLUDED.attempts,payload=EXCLUDED.payload,result=EXCLUDED.result,error=EXCLUDED.error,started_at=COALESCE(job_runs.started_at,EXCLUDED.started_at),completed_at=EXCLUDED.completed_at,updated_at=NOW()`,
-    [id(), data.userId || null, job.name || 'document', String(job.id), status, Number(job.attemptsMade || 0), JSON.stringify({ memoryId: data.memoryId, objectKey: data.objectKey, mimeType: data.mimeType }), extra.result ? JSON.stringify(extra.result) : null, extra.error || null]);
+    [id(), data.userId || null, job.name || 'document', String(job.id), status, Number(job.attemptsMade || 0), JSON.stringify({ documentId: data.documentId, memoryId: data.memoryId, objectKey: data.objectKey, mimeType: data.mimeType }), extra.result ? JSON.stringify(extra.result) : null, extra.error || null]);
 }
 
 const worker = new Worker('document-processing', async job => {
   await lifecycle(job, 'running');
-  const { filePath: supplied, objectKey, mimeType, memoryId } = job.data || {};
+  const { filePath: supplied, objectKey, mimeType, memoryId, documentId } = job.data || {};
   let filePath = supplied;
   const temporary = !filePath || !fs.existsSync(filePath);
   if (temporary) {
@@ -46,18 +46,18 @@ const worker = new Worker('document-processing', async job => {
     filePath = path.join(os.tmpdir(), `life-replay-doc-${job.id}-${path.basename(objectKey)}`);
     await storage.downloadToFile(objectKey, filePath);
   }
+  await pool.query('UPDATE documents SET status=$1,updated_at=NOW(),error=NULL WHERE id=$2 AND user_id=$3', ['processing', documentId, job.data.userId]);
   try {
-    if (!ocrCommand) {
-      const result = { status: 'extracted-pending-ocr', filePath, mimeType };
-      await lifecycle(job, 'completed', { result: { status: result.status, memoryId } });
-      return result;
-    }
+    if (!ocrCommand) throw new Error('OCR provider is not configured; set OCR_COMMAND before deploying the document worker');
     const args = JSON.parse(process.env.OCR_ARGS_JSON || '["{input}"]').map(x => String(x).replace('{input}', filePath));
     const text = await run(ocrCommand, args);
-    const result = { status: 'completed', text: text.slice(0, 500000), completedAt: new Date().toISOString() };
-    await lifecycle(job, 'completed', { result: { status: result.status, characters: result.text.length, memoryId } });
+    const extracted = text.slice(0, 500000);
+    await pool.query('UPDATE documents SET status=$1,extracted_text=$2,error=NULL,completed_at=NOW(),updated_at=NOW() WHERE id=$3 AND user_id=$4', ['completed', extracted, documentId, job.data.userId]);
+    const result = { status: 'completed', characters: extracted.length, completedAt: new Date().toISOString() };
+    await lifecycle(job, 'completed', { result: { ...result, memoryId } });
     return result;
   } catch (error) {
+    await pool.query('UPDATE documents SET status=$1,error=$2,updated_at=NOW() WHERE id=$3 AND user_id=$4', ['failed', String(error.message).slice(0, 2000), documentId, job.data.userId]).catch(() => {});
     await lifecycle(job, 'failed', { error: String(error.message).slice(0, 2000) }).catch(() => {});
     throw error;
   } finally {
@@ -67,7 +67,6 @@ const worker = new Worker('document-processing', async job => {
 
 worker.on('failed', (job, err) => console.error('document job failed', job?.id, err));
 worker.on('error', err => console.error('document worker error', err));
-
 async function shutdown() { await worker.close(); await connection.quit(); await pool.end(); }
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
