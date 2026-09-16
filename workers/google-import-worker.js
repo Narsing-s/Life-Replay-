@@ -114,7 +114,9 @@ const worker = new Worker('google-import', async job => {
     if (!state.rowCount) throw new Error('Import job not found');
     await pool.query('UPDATE import_jobs SET status=$1,started_at=COALESCE(started_at,NOW()),updated_at=NOW() WHERE id=$2', ['running', importJobId]);
     let cursor = state.rows[0].cursor || null;
-    let imported = 0, skipped = 0, processed = 0;
+    let imported = Number(state.rows[0].imported_count || 0);
+    let skipped = Number(state.rows[0].skipped_count || 0);
+    let processed = Number(state.rows[0].processed_count || 0);
     do {
       const page = await listPage(accessToken, cursor);
       for (const item of page.mediaItems || []) {
