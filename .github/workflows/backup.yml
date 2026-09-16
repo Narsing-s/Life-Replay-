@@ -1,0 +1,63 @@
+name: Production database backup
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PGHOST: ${{ secrets.LIFEOS_PGHOST }}
+      PGPORT: ${{ secrets.LIFEOS_PGPORT }}
+      PGUSER: ${{ secrets.LIFEOS_PGUSER }}
+      PGPASSWORD: ${{ secrets.LIFEOS_PGPASSWORD }}
+      PGDATABASE: ${{ secrets.LIFEOS_PGDATABASE }}
+      S3_BUCKET: ${{ secrets.LIFEOS_BACKUP_BUCKET }}
+      S3_ENDPOINT: ${{ secrets.LIFEOS_BACKUP_ENDPOINT }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.LIFEOS_BACKUP_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.LIFEOS_BACKUP_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      BACKUP_PASSPHRASE: ${{ secrets.LIFEOS_BACKUP_PASSPHRASE }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client and AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client python3-pip gnupg
+          python3 -m pip install --user awscli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Validate backup secrets
+        run: |
+          test -n "$BACKUP_PASSPHRASE"
+          test -n "$S3_BUCKET"
+          test -n "$S3_ENDPOINT"
+      - name: Dump database
+        run: |
+          mkdir -p backup
+          pg_dump --format=custom --no-owner --no-privileges > backup/lifereplay.dump
+          test -s backup/lifereplay.dump
+      - name: Encrypt backup
+        run: |
+          umask 077
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" --symmetric --cipher-algo AES256 --output backup/lifereplay.dump.gpg backup/lifereplay.dump
+          rm -f backup/lifereplay.dump
+      - name: Upload encrypted off-site backup
+        run: |
+          key="lifereplay/$(date -u +%Y%m%dT%H%M%SZ).dump.gpg"
+          echo "BACKUP_KEY=$key" >> "$GITHUB_ENV"
+          aws --endpoint-url "$S3_ENDPOINT" s3 cp backup/lifereplay.dump.gpg "s3://$S3_BUCKET/$key" --only-show-errors
+      - name: Verify uploaded backup can be decrypted and inspected
+        run: |
+          mkdir -p verify
+          aws --endpoint-url "$S3_ENDPOINT" s3 cp "s3://$S3_BUCKET/$BACKUP_KEY" verify/lifereplay.dump.gpg --only-show-errors
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" --decrypt --output verify/lifereplay.dump verify/lifereplay.dump.gpg
+          test -s verify/lifereplay.dump
+          pg_restore --list verify/lifereplay.dump > verify/contents.txt
+          grep -q 'TABLE DATA' verify/contents.txt
+          rm -rf verify

@@ -10,9 +10,20 @@ Module._load = function(request, parent, isMain) {
   const loaded = originalLoad.apply(this, arguments);
   if (!wrapped && request === './feature-routes' && parent && path.basename(parent.filename) === 'server.js') {
     wrapped = true;
-    const productionRoutes = require(path.join(path.dirname(parent.filename), 'production-routes'));
+    const base = path.dirname(parent.filename);
+    const productionRoutes = require(path.join(base, 'production-routes'));
+    const integrationRoutes = require(path.join(base, 'integration-routes'));
+    const { observabilityMiddleware, metricsHandler } = require(path.join(base, 'observability'));
     return function(args) {
+      args.app.use(observabilityMiddleware);
       productionRoutes(args);
+      integrationRoutes(args);
+      args.app.get('/metrics', async (req, res) => {
+        const token = String(process.env.METRICS_TOKEN || '');
+        if (token && req.headers.authorization !== `Bearer ${token}`) return res.status(401).end();
+        if (!token && process.env.NODE_ENV === 'production') return res.status(404).end();
+        return metricsHandler(req, res);
+      });
       loaded(args);
     };
   }

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const Database = require('better-sqlite3');
 
 const backupDir = process.argv[2];
@@ -23,6 +24,18 @@ const users = db.prepare('SELECT COUNT(*) count FROM users').get().count;
 const memories = db.prepare('SELECT COUNT(*) count FROM memories').get().count;
 db.close();
 
+function sha256(file) {
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+const checksumResults = [];
+for (const [relative, expected] of Object.entries(manifest.checksums || {})) {
+  const file = path.join(root, relative);
+  const actual = fs.existsSync(file) ? sha256(file) : null;
+  checksumResults.push({ file: relative, expected, actual, ok: actual === expected });
+}
+const checksumOk = checksumResults.every(x => x.ok) && checksumResults.length === Number(manifest.fileCount || checksumResults.length);
+
 const mediaRoots = ['uploads', 'media'];
 const mediaFiles = mediaRoots.reduce((total, dir) => {
   const full = path.join(root, dir);
@@ -32,13 +45,15 @@ const mediaFiles = mediaRoots.reduce((total, dir) => {
 }, 0);
 
 const result = {
-  ok: integrity === 'ok',
+  ok: integrity === 'ok' && checksumOk,
   backup: root,
   manifest,
   sqliteIntegrity: integrity,
   users,
   memories,
   mediaFiles,
+  checksumOk,
+  checksumFailures: checksumResults.filter(x => !x.ok),
   verifiedAt: new Date().toISOString()
 };
 console.log(JSON.stringify(result, null, 2));

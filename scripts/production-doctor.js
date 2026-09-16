@@ -1,23 +1,25 @@
-const { providerStatus } = require('../production-services');
+const { providerStatus, connectivityStatus } = require('../production-services');
 
-const status = providerStatus();
-const checks = [
-  ['PostgreSQL', status.database.configured],
-  ['Object storage', status.objectStorage.configured],
-  ['Email delivery', status.email.configured],
-  ['LLM', status.ai.configured],
-  ['Embeddings', status.embeddings.configured],
-  ['Distributed rate limiting', status.distributedRateLimit.configured],
-  ['Video transcoding', status.transcoding.configured],
-  ['Malware scanning', status.malwareScanning.configured],
-  ['Observability exporter', status.observability.configured]
-];
-console.log(JSON.stringify({ generatedAt: new Date().toISOString(), providers: status, checks }, null, 2));
-const required = ['DATABASE_URL','S3_ENDPOINT','S3_BUCKET','REDIS_URL'];
-if (process.env.NODE_ENV === 'production') {
-  const missing = required.filter(k => !String(process.env[k] || '').trim());
-  if (missing.length) {
-    console.error(`Missing production infrastructure variables: ${missing.join(', ')}`);
-    process.exitCode = 1;
-  }
-}
+(async () => {
+  const status = providerStatus();
+  const connectivity = await connectivityStatus();
+  const checks = [
+    ['PostgreSQL configured', status.database.configured],
+    ['PostgreSQL reachable', connectivity.connectivity.postgres.reachable],
+    ['Object storage configured', status.objectStorage.configured],
+    ['Email delivery configured', status.email.configured],
+    ['LLM configured', status.ai.configured],
+    ['Embeddings configured', status.embeddings.configured],
+    ['Redis configured', status.distributedRateLimit.configured],
+    ['Redis reachable', connectivity.connectivity.redis.reachable],
+    ['Video transcoding configured', status.transcoding.configured],
+    ['Malware scanning configured', status.malwareScanning.configured],
+    ['Observability exporter configured', status.observability.configured]
+  ];
+  const required = ['DATABASE_URL','S3_BUCKET','REDIS_URL'];
+  const missing = process.env.NODE_ENV === 'production' ? required.filter(k => !String(process.env[k] || '').trim()) : [];
+  const failedConnectivity = process.env.NODE_ENV === 'production' && (!connectivity.connectivity.postgres.reachable || !connectivity.connectivity.redis.reachable || !status.objectStorage.configured);
+  const result = { generatedAt:new Date().toISOString(), providers:connectivity, checks, missing, ok:missing.length===0 && !failedConnectivity };
+  console.log(JSON.stringify(result,null,2));
+  if (!result.ok) process.exitCode=1;
+})().catch(err => { console.error(err.stack || err); process.exitCode=1; });

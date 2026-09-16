@@ -1,33 +1,60 @@
 const crypto = require('crypto');
+const { productionConfig } = require('./platform-config');
 
-// Process-local limiter. This protects a single instance; use a shared store
-// (Redis/managed rate-limit service) when running multiple API replicas.
 const buckets = new Map();
 const WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000);
 const MAX_REQUESTS = Number(process.env.RATE_LIMIT_MAX || 300);
 const AUTH_MAX = Number(process.env.AUTH_RATE_LIMIT_MAX || 20);
+let redis = null;
+let redisFailed = false;
 
 function clientKey(req) {
   const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
   return forwarded || req.socket.remoteAddress || 'unknown';
 }
 
+function getRedis() {
+  if (!process.env.REDIS_URL || redisFailed) return null;
+  if (!redis) {
+    try {
+      const IORedis = require('ioredis');
+      redis = new IORedis(process.env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 });
+      redis.on('error', () => { redisFailed = true; });
+    } catch { redisFailed = true; }
+  }
+  return redis;
+}
+
+async function redisCount(key, limit) {
+  const r = getRedis();
+  if (!r) return null;
+  try {
+    if (r.status === 'wait') await r.connect();
+    const script = `local c=redis.call('INCR',KEYS[1]); if c==1 then redis.call('PEXPIRE',KEYS[1],ARGV[1]); end; return {c,redis.call('PTTL',KEYS[1])}`;
+    const result = await r.eval(script, 1, key, String(WINDOW_MS));
+    return { count: Number(result[0]), ttl: Number(result[1]) };
+  } catch { redisFailed = true; return null; }
+}
+
+function localCount(key) {
+  const now = Date.now();
+  let bucket = buckets.get(key);
+  if (!bucket || now - bucket.started >= WINDOW_MS) bucket = { started: now, count: 0 };
+  bucket.count += 1; buckets.set(key, bucket);
+  return { count: bucket.count, ttl: Math.max(1, bucket.started + WINDOW_MS - now) };
+}
+
 function limiter(limit, prefix) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     if (process.env.NODE_ENV !== 'production' && process.env.DISABLE_RATE_LIMIT === 'true') return next();
-    const key = `${prefix}:${clientKey(req)}`;
-    const now = Date.now();
-    let bucket = buckets.get(key);
-    if (!bucket || now - bucket.started >= WINDOW_MS) bucket = { started: now, count: 0 };
-    bucket.count += 1;
-    buckets.set(key, bucket);
-    if (bucket.count > limit) {
-      const retryAfter = Math.max(1, Math.ceil((bucket.started + WINDOW_MS - now) / 1000));
-      res.setHeader('Retry-After', retryAfter);
+    const key = `life-replay:ratelimit:${prefix}:${clientKey(req)}`;
+    const result = await redisCount(key, limit) || localCount(key);
+    if (result.count > limit) {
+      res.setHeader('Retry-After', Math.max(1, Math.ceil(result.ttl / 1000)));
       return res.status(429).json({ error: 'Too many requests. Please try again later.' });
     }
     res.setHeader('X-RateLimit-Limit', limit);
-    res.setHeader('X-RateLimit-Remaining', Math.max(0, limit - bucket.count));
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, limit - result.count));
     next();
   };
 }
