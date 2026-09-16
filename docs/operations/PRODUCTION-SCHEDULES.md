@@ -70,7 +70,7 @@ Run daily after normal media processing has had time to settle:
 npm run cleanup:media
 ```
 
-The cleanup is bounded and idempotent. `ORPHAN_MEDIA_AGE_HOURS` controls the grace period.
+Cleanup is **dry-run by default**. Set `ORPHAN_MEDIA_DRY_RUN=false` only after reviewing the reported orphan objects. `ORPHAN_MEDIA_AGE_HOURS` controls the grace period and `ORPHAN_MEDIA_MAX_OBJECTS` bounds each run. The job removes stale unowned media rows and remote objects that have no database reference; it never removes referenced media.
 
 ### Queue workers
 
