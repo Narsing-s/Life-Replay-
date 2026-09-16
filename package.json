@@ -8,7 +8,7 @@
     "start": "npm run preflight && node -r ./feature-loader.js server.js",
     "preview": "npm run preflight && node -r ./feature-loader.js server.js",
     "test": "node --test",
-    "check": "node --check server.js && node --check feature-loader.js && node --check feature-routes.js && node --check scripts/preflight.js && node --check scripts/backup.js",
+    "check": "node --check server.js && node --check security.js && node --check feature-loader.js && node --check feature-routes.js && node --check scripts/preflight.js && node --check scripts/backup.js && node --check scripts/start-production.js",
     "preflight": "node scripts/preflight.js",
     "backup": "node scripts/backup.js"
   },
