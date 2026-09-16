@@ -14,6 +14,8 @@ const { providerStatus, connectivityStatus } = require('../production-services')
     ['Redis reachable', connectivity.connectivity.redis.reachable],
     ['Video transcoding configured', status.transcoding.configured],
     ['Malware scanning configured', status.malwareScanning.configured],
+    ['OCR configured', status.ocr.configured],
+    ['Google OAuth configured', status.googlePhotos.configured],
     ['Observability exporter configured', status.observability.configured]
   ];
   const required = ['DATABASE_URL','S3_BUCKET','REDIS_URL'];
