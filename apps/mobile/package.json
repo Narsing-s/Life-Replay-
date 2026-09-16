@@ -1,0 +1,7 @@
+{
+  "name": "@lifeos/mobile",
+  "private": true,
+  "version": "0.1.0",
+  "description": "LifeOS mobile client boundary",
+  "scripts": { "typecheck": "tsc --noEmit" }
+}
