@@ -8,7 +8,21 @@
     "start": "node scripts/start-production.js",
     "preview": "node scripts/start-production.js",
     "test": "node --test",
-    "check": "node --check server.js && node --check server-production.js && node --check security.js && node --check feature-loader.js && node --check feature-routes.js && node --check production-services.js && node --check production-routes.js && node --check integration-routes.js && node --check platform-config.js && node --check storage-adapter.js && node --check queue-adapter.js && node --check observability.js && node --check realtime-server.js && node --check workers/media-worker.js && node --check workers/document-worker.js && node --check workers/ai-worker.js && node --check workers/notification-worker.js && node --check scripts/preflight.js && node --check scripts/backup.js && node --check scripts/start-production.js && node --check scripts/ensure-postgres-schema.js && node --check scripts/production-doctor.js && node --check scripts/restore-check.js && node --check scripts/verify-backup.js && node --check scripts/migrate-sqlite-to-postgres.js && node --check scripts/restore-drill.js && node --check scripts/migrate-media-to-object-storage.js
+    "check": "node --check server.js && node --check server-production.js && node --check security.js && node --check feature-loader.js && node --check feature-routes.js && node --check production-services.js && node --check production-routes.js && node --check integration-routes.js && node --check platform-config.js && node --check storage-adapter.js && node --check queue-adapter.js && node --check observability.js && node --check realtime-server.js && node --check workers/media-worker.js && node --check workers/document-worker.js && node --check workers/ai-worker.js && node --check workers/notification-worker.js && node --check scripts/preflight.js && node --check scripts/backup.js && node --check scripts/backup-postgres.js && node --check scripts/start-production.js && node --check scripts/ensure-postgres-schema.js && node --check scripts/production-doctor.js && node --check scripts/restore-check.js && node --check scripts/verify-backup.js && node --check scripts/migrate-sqlite-to-postgres.js && node --check scripts/restore-drill.js && node --check scripts/migrate-media-to-object-storage.js",
+    "preflight": "node scripts/preflight.js",
+    "backup": "node scripts/backup.js",
+    "backup:postgres": "node scripts/backup-postgres.js",
+    "doctor": "node scripts/production-doctor.js",
+    "restore-check": "node scripts/restore-check.js",
+    "verify-backup": "node scripts/verify-backup.js",
+    "migrate:postgres": "node scripts/migrate-sqlite-to-postgres.js",
+    "migrate:media": "node scripts/migrate-media-to-object-storage.js",
+    "restore:drill": "node scripts/restore-drill.js",
+    "worker:media": "node workers/media-worker.js",
+    "worker:document": "node workers/document-worker.js",
+    "worker:ai": "node workers/ai-worker.js",
+    "worker:notifications": "node workers/notification-worker.js",
+    "realtime": "node realtime-server.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.879.0",
