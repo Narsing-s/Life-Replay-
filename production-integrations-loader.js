@@ -13,9 +13,9 @@ Module._load = function(request, parent, isMain) {
     return {
       ...loaded,
       installProductionExtendedRoutes(args) {
+        documents.installProductionDocumentRoutes(args);
         loaded.installProductionExtendedRoutes(args);
         integrations.installProductionIntegrations(args);
-        documents.installProductionDocumentRoutes(args);
       }
     };
   }
