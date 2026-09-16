@@ -12,6 +12,8 @@ Run daily during the lowest-traffic period:
 npm run backup:postgres
 ```
 
+When off-site protection is required, set `BACKUP_OFFSITE=true` and provide the S3-compatible backup credentials. The backup command reports `offsite` only after the upload succeeds.
+
 ### Backup retention
 
 Run after the backup job:
@@ -39,6 +41,16 @@ Run at least monthly against a disposable PostgreSQL instance. Never restore a p
 ```bash
 npm run restore:drill
 ```
+
+### Orphan media cleanup
+
+Run daily after normal media processing has had time to settle:
+
+```bash
+npm run cleanup:media
+```
+
+The cleanup is bounded and idempotent. `ORPHAN_MEDIA_AGE_HOURS` controls the grace period.
 
 ### Queue workers
 
