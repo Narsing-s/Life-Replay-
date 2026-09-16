@@ -19,13 +19,13 @@ sub.on('pmessage',(_,channel,payload)=>{const userId=channel.split(':').pop();fo
 
 wss.on('connection',(ws,req)=>{
   try{
+    const protocols=String(req.headers['sec-websocket-protocol']||'').split(',').map(x=>x.trim());
     const url=new URL(req.url,'http://localhost');
-    const token=url.searchParams.get('token');
+    const token=protocols[1]||url.searchParams.get('token');
     const claims=jwt.verify(String(token||''),secret);
-    const userId=String(claims.sub);
-    if(!userId)throw new Error('missing subject');
-    if(!sockets.has(userId))sockets.set(userId,new Set());
-    sockets.get(userId).add(ws);
+    if(claims.purpose!=='realtime')throw new Error('invalid token purpose');
+    const userId=String(claims.sub);if(!userId)throw new Error('missing subject');
+    if(!sockets.has(userId))sockets.set(userId,new Set());sockets.get(userId).add(ws);
     ws.send(JSON.stringify({type:'connected',userId}));
     ws.on('message',async raw=>{try{const msg=JSON.parse(raw.toString());if(!msg||typeof msg.type!=='string')return;if(msg.type==='ping')return ws.send(JSON.stringify({type:'pong',ts:Date.now()}));if(msg.type==='publish')await publish(userId,{type:'event',event:msg.event||'update',payload:msg.payload||{}});}catch{ws.send(JSON.stringify({type:'error',error:'Invalid realtime message'}));}});
     ws.on('close',()=>{sockets.get(userId)?.delete(ws);if(!sockets.get(userId)?.size)sockets.delete(userId);});
