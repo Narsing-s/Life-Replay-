@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { sendEmail, askLLM, embed, randomToken, sha256, providerStatus, env } = require('./production-services');
+const { sendEmail, askLLM, embed, randomToken, sha256, providerStatus, connectivityStatus, env } = require('./production-services');
 
 module.exports = function productionRoutes({ app, db, auth }) {
   const now = () => new Date().toISOString();
@@ -18,8 +18,7 @@ module.exports = function productionRoutes({ app, db, auth }) {
 
   const issueToken = (userId, type, ttlMs) => {
     const raw = randomToken(32);
-    db.prepare('INSERT INTO account_tokens VALUES(?,?,?,?,?,?,?)')
-      .run(crypto.randomUUID(), userId, type, sha256(raw), new Date(Date.now() + ttlMs).toISOString(), null, now());
+    db.prepare('INSERT INTO account_tokens VALUES(?,?,?,?,?,?,?)').run(crypto.randomUUID(), userId, type, sha256(raw), new Date(Date.now() + ttlMs).toISOString(), null, now());
     return raw;
   };
 
@@ -30,7 +29,16 @@ module.exports = function productionRoutes({ app, db, auth }) {
     return row;
   };
 
-  app.get('/api/health/providers', (_, res) => res.json({ ok: true, providers: providerStatus() }));
+  app.get('/api/health/providers', async (_, res) => {
+    try {
+      const providers = await connectivityStatus();
+      const externalChecks = ['postgres', 'redis'].map(k => providers.connectivity?.[k]).filter(Boolean);
+      const failed = externalChecks.some(x => x.configured && !x.reachable);
+      res.status(failed ? 503 : 200).json({ ok: !failed, providers });
+    } catch {
+      res.status(503).json({ ok: false, providers: providerStatus(), error: 'Provider health check failed' });
+    }
+  });
   app.get('/api/auth/verification-status', auth, (req, res) => {
     const user = db.prepare('SELECT email_verified_at FROM users WHERE id=?').get(req.user.id);
     res.json({ verified: Boolean(user?.email_verified_at), verifiedAt: user?.email_verified_at || null });
@@ -86,7 +94,6 @@ module.exports = function productionRoutes({ app, db, auth }) {
     res.json({ ok: true });
   });
 
-  // Proper refresh-token rotation. The old refresh token is revoked before the new token is issued.
   app.post('/api/v1/auth/refresh', async (req, res) => {
     const raw = String(req.body?.refreshToken || '');
     if (!raw) return res.status(401).json({ error: 'refreshToken is required' });
