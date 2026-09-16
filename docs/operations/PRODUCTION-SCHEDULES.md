@@ -14,9 +14,19 @@ npm run backup:postgres
 
 When off-site protection is required, set `BACKUP_OFFSITE=true` and provide the S3-compatible backup credentials. The backup command reports `offsite` only after the upload succeeds.
 
+### Backup verification
+
+After every backup, verify the custom-format archive and checksum before retention removes older copies:
+
+```bash
+npm run backup:verify -- ./data/backups-postgres/<backup>.dump
+```
+
+The verifier checks archive readability, required core tables and the SHA-256 sidecar when present.
+
 ### Backup retention
 
-Run after the backup job:
+Run after verification:
 
 ```bash
 npm run backup:retention
@@ -33,6 +43,16 @@ npm run doctor
 ```
 
 Treat a non-zero exit code as an alert. The doctor checks PostgreSQL, Redis, object storage and configured providers.
+
+### Stale-job reconciliation
+
+Run every 10–15 minutes:
+
+```bash
+npm run jobs:reconcile
+```
+
+This marks jobs whose worker heartbeat has exceeded `STALE_JOB_MINUTES` (default 60) as failed and records the failure. It prevents permanently stuck `running` records from appearing healthy forever.
 
 ### Restore drill
 
