@@ -8,9 +8,10 @@
     "start": "npm run preflight && node -r ./feature-loader.js server.js",
     "preview": "npm run preflight && node -r ./feature-loader.js server.js",
     "test": "node --test",
-    "check": "node --check server.js && node --check security.js && node --check feature-loader.js && node --check feature-routes.js && node --check scripts/preflight.js && node --check scripts/backup.js && node --check scripts/start-production.js",
+    "check": "node --check server.js && node --check security.js && node --check feature-loader.js && node --check feature-routes.js && node --check production-services.js && node --check production-routes.js && node --check scripts/preflight.js && node --check scripts/backup.js && node --check scripts/start-production.js && node --check scripts/production-doctor.js",
     "preflight": "node scripts/preflight.js",
-    "backup": "node scripts/backup.js"
+    "backup": "node scripts/backup.js",
+    "doctor": "node scripts/production-doctor.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
