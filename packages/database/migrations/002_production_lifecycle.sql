@@ -43,6 +43,9 @@ CREATE TABLE IF NOT EXISTS import_jobs (
   completed_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE import_jobs ADD COLUMN IF NOT EXISTS imported_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE import_jobs ADD COLUMN IF NOT EXISTS skipped_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE import_jobs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 CREATE INDEX IF NOT EXISTS idx_import_jobs_user ON import_jobs(user_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_import_jobs_status ON import_jobs(status,updated_at);
 
