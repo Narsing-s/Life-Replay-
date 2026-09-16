@@ -5,70 +5,98 @@ Updated: 2026-09-16
 ## Current deployment
 
 - Frontend: GitHub Pages
-- Backend test deployment: SnapDeploy
+- Verified test backend: SnapDeploy
 - Runtime: Node/Express
 - Current SnapDeploy compatibility storage: SQLite + container filesystem
 - Current SnapDeploy URL: `https://life-replay-api-91493.containers.snapdeploy.app`
 
-The current hosted backend is for application testing. It is not yet the final durable lifetime-memory deployment.
+The current hosted backend is for application testing. It is not the final durable lifetime-memory deployment.
 
-## Production-hardening capabilities in this branch
+## Product/UI status
+
+The web workspace exposes these product areas:
+
+- Add Memory
+- Timeline
+- Replay
+- Photos & Imports
+- Documents & OCR
+- Search & AI
+- Map
+- Calendar
+- People
+- Tags
+- Favorites
+- Trash
+- Background Jobs
+- Account
+- Settings
+- Integrations
+- Notifications
+- Security
+
+Provider-dependent capabilities remain visible but must show their real configuration state. The UI must not fabricate successful imports, OCR, or AI operations.
+
+## Production-hardening capabilities
 
 | Capability | Status |
 |---|---|
-| PostgreSQL schema + pgvector | ✅ Added |
-| Ordered PostgreSQL migrations | ✅ Added |
-| S3/R2/MinIO storage adapter | ✅ Added |
-| Private/signed media capability | ✅ Added |
-| Redis/BullMQ queues | ✅ Added |
-| Media processing lifecycle | ✅ Added |
-| Document/OCR worker | ✅ Added; OCR provider required |
-| Google Photos OAuth/import pipeline | ✅ Added; provider credentials required |
-| AI/embedding provider integration | ✅ Added; provider credentials required |
-| Notification worker | ✅ Added |
-| Realtime gateway | ✅ Added; client deployment still required |
-| Backup/checksum/retention tooling | ✅ Added |
-| Restore-drill tooling | ✅ Added |
-| Orphan-media cleanup | ✅ Added; dry-run by default |
-| Stale-job reconciliation | ✅ Added |
-| Production doctor/preflight | ✅ Added |
-| CI/security validation | ✅ Added |
-| Native mobile client | 🟡 Not yet shipped |
-| Native desktop client | 🟡 Not yet shipped |
+| PostgreSQL schema + pgvector | Implemented |
+| Ordered PostgreSQL migrations | Implemented |
+| S3/R2/MinIO storage adapter | Implemented |
+| Private/signed media capability | Implemented |
+| Redis/BullMQ queues | Implemented |
+| Media processing lifecycle | Implemented; provider/worker dependencies required |
+| Malware scanning | Implemented; ClamAV required |
+| Video transcoding | Implemented; FFmpeg required |
+| Document/OCR worker | Implemented; OCR provider required |
+| Google Photos OAuth/import pipeline | Implemented; Google credentials required |
+| Google resumable import/deduplication | Implemented |
+| AI/embedding provider integration | Implemented; provider credentials required |
+| Replay generation jobs | Implemented; AI provider required for generated output |
+| Notification worker | Implemented; provider configuration as required |
+| Realtime gateway | Implemented; frontend/mobile client adoption remains incremental |
+| Backup/checksum/retention tooling | Implemented |
+| Backup verification | Implemented |
+| Restore-drill tooling | Implemented |
+| Orphan-media cleanup | Implemented; dry-run by default |
+| Stale-job reconciliation | Implemented |
+| Production doctor/preflight | Implemented |
+| CI/security validation | Implemented |
+| Browser E2E release gate | Still required |
+| Native mobile client | Not shipped in current web deployment |
+| Native desktop client | Not shipped in current web deployment |
+| Apple Photos server import | Not enabled |
+| External calendar synchronization | Not enabled |
 
 ## Durable production cutover
 
 Before calling the service a durable lifetime-memory system:
 
 1. Deploy the PostgreSQL production runtime.
-2. Configure Redis.
-3. Configure S3/R2/MinIO object storage.
+2. Configure Redis/BullMQ.
+3. Configure S3/R2-compatible object storage.
 4. Run ordered database migrations.
-5. Move all media writes away from the local filesystem.
-6. Enable authenticated private media access.
-7. Deploy long-running workers.
-8. Configure backups and off-site backup verification.
-9. Run `npm run doctor`.
-10. Perform a restore drill.
+5. Move all authoritative media writes away from the local container filesystem.
+6. Enable authenticated/private media access.
+7. Deploy long-running workers separately from the API.
+8. Configure backups, verification and off-site copies.
+9. Run `npm run doctor` against the real deployment.
+10. Perform an isolated restore drill.
 11. Test the browser against the deployed API.
 12. Verify a second API instance can read the same user data.
+13. Run browser E2E tests.
 
 ## Hosting
 
-The repository is prepared for Docker-based hosting and includes `render.yaml` plus deployment documentation. The repository connection itself does not have credentials to create a service in an external hosting account, so no new external service is claimed as deployed unless its URL is actually verified.
+The repository is Docker-ready and includes `render.yaml` plus deployment documentation. The repository connection does not have credentials to create a service inside an external hosting account, so no new external service is claimed as deployed unless its URL is actually verified.
 
-See `docs/DEPLOYMENT.md` for the current SnapDeploy deployment, Render/Docker deployment path and durable production architecture.
+See `docs/DEPLOYMENT.md` and `docs/BACKEND-HOSTING.md` for the deployment procedure.
 
-## Remaining work
+## Provider honesty
 
-- Complete PostgreSQL repository/service cutover for every feature route.
-- Complete all frontend integrations with realtime/job status.
-- Add native mobile and desktop clients.
-- Complete provider-specific Calendar/Drive integrations.
-- Add full collaboration/share-permission UI.
-- Complete browser E2E and load/failure testing.
-- Finish production monitoring/alerting and documented RPO/RTO operations.
+A capability may be visible in the UI while still being provider-disabled. Status must distinguish `available`, `configured`, `queued`, `running`, `completed`, `failed` and `not configured` where applicable.
 
 ## Release gate
 
-Do not advertise the current SnapDeploy SQLite deployment as a durable backup of irreplaceable memories. The durable release gate requires PostgreSQL, Redis, object storage, successful backups/restores, worker processing, multi-instance validation and browser E2E verification.
+Do not advertise the current SnapDeploy SQLite deployment as a durable backup of irreplaceable memories. The durable release gate requires PostgreSQL, Redis, object storage, successful backup/restore verification, worker processing, private media, multi-instance validation and browser E2E verification.
