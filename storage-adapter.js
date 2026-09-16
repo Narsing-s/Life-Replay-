@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { productionConfig } = require('./platform-config');
 
@@ -18,6 +18,15 @@ function createStorage() {
   async function downloadToFile(key, targetPath) { if (!remote) { await fs.promises.copyFile(key, targetPath); return targetPath; } const result = await client.send(new GetObjectCommand({ Bucket: cfg.objectStorage.bucket, Key: key })); await new Promise((resolve,reject)=>{ const out=fs.createWriteStream(targetPath); result.Body.pipe(out); result.Body.on('error',reject); out.on('finish',resolve); out.on('error',reject); }); return targetPath; }
   async function remove(key) { if (!key) return; if (!remote) { try { fs.unlinkSync(key); } catch {} return; } await client.send(new DeleteObjectCommand({ Bucket: cfg.objectStorage.bucket, Key: key })); }
   async function exists(key) { if (!remote) return fs.existsSync(key); try { await client.send(new HeadObjectCommand({ Bucket: cfg.objectStorage.bucket, Key: key })); return true; } catch { return false; } }
-  return { provider: remote ? 's3-compatible' : 'filesystem', remote, keyFor, putFile, putBuffer, signedReadUrl, downloadToFile, remove, exists };
+  async function list(prefix = '', maxKeys = 500) {
+    const limit = Math.max(1, Math.min(1000, Number(maxKeys) || 500));
+    if (!remote) {
+      const entries = await fs.promises.readdir(localRoot, { withFileTypes: true });
+      return entries.filter(e => e.isFile()).map(e => ({ key: path.join(localRoot, e.name), size: 0, lastModified: null })).slice(0, limit);
+    }
+    const result = await client.send(new ListObjectsV2Command({ Bucket: cfg.objectStorage.bucket, Prefix: prefix, MaxKeys: limit }));
+    return (result.Contents || []).map(o => ({ key: o.Key, size: Number(o.Size || 0), lastModified: o.LastModified || null }));
+  }
+  return { provider: remote ? 's3-compatible' : 'filesystem', remote, keyFor, putFile, putBuffer, signedReadUrl, downloadToFile, remove, exists, list };
 }
 module.exports = { createStorage };
