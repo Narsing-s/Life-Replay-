@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 
 module.exports = function integrationRoutes({ app, db, auth }) {
   const now=()=>new Date().toISOString();
@@ -30,15 +31,21 @@ module.exports = function integrationRoutes({ app, db, auth }) {
     try{
       const r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({code,client_id:c.clientId,client_secret:c.clientSecret,redirect_uri:c.redirectUri,grant_type:'authorization_code'}),signal:AbortSignal.timeout(15000)});
       if(!r.ok)throw new Error(`Google token exchange failed: ${r.status}`);
-      const t=await r.json();
-      const created=now();
+      const t=await r.json(); const created=now();
       db.prepare(`INSERT INTO integrations(id,user_id,provider,status,encrypted_access_token,encrypted_refresh_token,expires_at,scopes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,provider) DO UPDATE SET status='active',encrypted_access_token=excluded.encrypted_access_token,encrypted_refresh_token=COALESCE(excluded.encrypted_refresh_token,integrations.encrypted_refresh_token),expires_at=excluded.expires_at,scopes=excluded.scopes,updated_at=excluded.updated_at`).run(crypto.randomUUID(),s.user_id,'google','active',encrypt(t.access_token),t.refresh_token?encrypt(t.refresh_token):null,new Date(Date.now()+Number(t.expires_in||3600)*1000).toISOString(),String(t.scope||''),created,created);
       res.redirect(`${c.frontend||c.redirectUri}?google=connected`);
-    }catch(e){res.status(502).send('Google authorization could not be completed');}
+    }catch{res.status(502).send('Google authorization could not be completed');}
   });
 
   app.get('/api/v1/integrations',auth,(req,res)=>res.json({integrations:db.prepare('SELECT provider,status,expires_at expiresAt,scopes,created_at createdAt,updated_at updatedAt FROM integrations WHERE user_id=?').all(req.user.id)}));
   app.delete('/api/v1/integrations/google',auth,(req,res)=>{db.prepare('DELETE FROM integrations WHERE user_id=? AND provider=?').run(req.user.id,'google');res.status(204).end();});
+
+  app.post('/api/v1/realtime/token',auth,(req,res)=>{
+    const secret=String(process.env.JWT_SECRET||'');
+    if(secret.length<32||secret==='change-me-in-production')return res.status(503).json({error:'JWT_SECRET is not configured'});
+    const token=jwt.sign({sub:req.user.id,purpose:'realtime'},secret,{expiresIn:'60s'});
+    res.json({token,expiresIn:60});
+  });
 
   // Internal helper for future Google import workers. Tokens never leave the server in API responses.
   app.locals.getGoogleIntegration=async userId=>{const row=db.prepare('SELECT * FROM integrations WHERE user_id=? AND provider=? AND status=?').get(userId,'google','active');if(!row)return null;return {...row,accessToken:decrypt(row.encrypted_access_token),refreshToken:row.encrypted_refresh_token?decrypt(row.encrypted_refresh_token):null};};
