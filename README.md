@@ -12,6 +12,14 @@ The existing **Memory Atlas** UI is intentionally preserved: dark editorial styl
 
 The current backend provides authenticated users, user-scoped memories, media uploads, profile controls, favorites/pins, trash/recovery, tags, people, locations, sessions, sharing, audit records, AI-style timeline queries, export and health/readiness endpoints.
 
+## Advanced Memory Experiences
+
+The web app now includes authenticated **AI Assistant**, **Replay Studio**, **Memory Calendar**, **Places**, and **Life Insights** screens. Replay Studio saves date-range timeline replays; the calendar, places and insights views are derived from the signed-in user's stored memories. Data export is available from Life Insights.
+
+These are connected to existing user-scoped APIs; they do not populate fake sample memories. The replay feature currently creates a saved narrative/timeline record, not a rendered MP4. Places currently groups recorded place labels and does not claim to be a GPS map. AI uses the configured LLM route when available and falls back to the existing timeline assistant.
+
+See [Advanced Experience](docs/ADVANCED-EXPERIENCE.md) for endpoint mappings, capability boundaries and the next production milestones.
+
 ## 🤖 Life Replay Chatbot
 
 The Life Replay chatbot is the natural-language assistant for your personal memory timeline.
